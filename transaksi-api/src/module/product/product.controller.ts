@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { ApiOperation, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { ProductUnitEnum } from 'src/common/entity/product_unit/product_unit.entity';
 
 @Controller('product')
 export class ProductController {
@@ -74,6 +75,90 @@ export class ProductController {
   @ApiOperation({ summary: 'Restore soft-deleted product' })
   async restore(@Param('uuid') uuid: string) {
     return this.productService.restore(uuid);
+  }
+
+  @Post('add-unit/:uuid')
+  @ApiOperation({ summary: 'Add unit to product' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        unitName: {
+          type: 'string',
+          enum: Object.values(ProductUnitEnum),
+          example: 'PCS',
+        },
+        unitMultiplier: {
+          type: 'number',
+          example: 12,
+        },
+        setAsDefault: {
+          type: 'boolean',
+          example: true,
+        },
+        userId: {
+          type: 'string',
+          example: 'user-uuid-123',
+        },
+      },
+      required: ['unitName', 'unitMultiplier'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Unit added successfully',
+  })
+  async addUnit(
+    @Param('uuid') uuid: string,
+    @Body()
+    body: {
+      unitName: ProductUnitEnum;
+      unitMultiplier: number;
+      setAsDefault?: boolean;
+      userId?: string;
+    },
+  ) {
+    return this.productService.addUnit(
+      uuid,
+      body.unitName,
+      body.unitMultiplier,
+      body.setAsDefault,
+      body.userId,
+    );
+  }
+
+  @Post('add-price/:uuid')
+  @ApiOperation({ summary: 'Add price to product' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        price: { type: 'number', example: 15000 },
+        unitUuid: { type: 'string', example: 'unit-uuid-123', nullable: true },
+        setAsDefault: { type: 'boolean', example: false },
+        userId: { type: 'string', example: 'user-uuid-123' },
+      },
+      required: ['price'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Price added successfully' })
+  async addPrice(
+    @Param('uuid') uuid: string,
+    @Body()
+    body: {
+      price: number;
+      unitUuid: string;
+      setAsDefault?: boolean;
+      userId?: string;
+    },
+  ) {
+    return this.productService.addPrice(
+      uuid,
+      body.price,
+      body.unitUuid,
+      body.setAsDefault ?? false,
+      body.userId,
+    );
   }
 
   @Post('add-stok/:uuid')

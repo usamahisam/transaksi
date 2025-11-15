@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { ProductStockEntity } from '../product_stock/product_stock.entity';
 import { ProductUnitEntity } from '../product_unit/product_unit.entity';
+import { ProductPriceEntity } from '../product_price/product_price.entity';
 
 @Entity('product')
 export class ProductEntity {
@@ -23,6 +24,9 @@ export class ProductEntity {
 
   @Column({ name: 'default_unit_uuid', type: 'uuid', nullable: true })
   defaultUnitUuid?: string;
+
+  @Column({ name: 'default_price_uuid', type: 'uuid', nullable: true })
+  defaultPriceUuid?: string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
@@ -47,4 +51,7 @@ export class ProductEntity {
 
   @OneToMany(() => ProductStockEntity, (stock) => stock.product)
   stock: ProductStockEntity[];
+
+  @OneToMany(() => ProductPriceEntity, (price) => price.product)
+  price: ProductPriceEntity[];
 }

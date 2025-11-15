@@ -3,6 +3,7 @@ import { Repository } from 'typeorm';
 import { ProductEntity } from 'src/common/entity/product/product.entity';
 import { ProductStockEntity } from 'src/common/entity/product_stock/product_stock.entity';
 import { ProductUnitEntity, ProductUnitEnum } from 'src/common/entity/product_unit/product_unit.entity';
+import { ProductPriceEntity } from 'src/common/entity/product_price/product_price.entity';
 
 @Injectable()
 export class ProductService {
@@ -10,9 +11,11 @@ export class ProductService {
     @Inject('PRODUCT_REPOSITORY')
     private readonly productRepo: Repository<ProductEntity>,
     @Inject('PRODUCT_UNIT_REPOSITORY')
-private readonly unitRepo: Repository<ProductUnitEntity>,
+    private readonly unitRepo: Repository<ProductUnitEntity>,
     @Inject('PRODUCT_STOCK_REPOSITORY')
     private readonly stokRepo: Repository<ProductStockEntity>,
+    @Inject('PRODUCT_PRICE_REPOSITORY')
+    private readonly priceRepo: Repository<ProductPriceEntity>,
   ) {}
 
   async create(name: string, userId?: string) {
@@ -83,6 +86,39 @@ private readonly unitRepo: Repository<ProductUnitEntity>,
       await this.productRepo.save(product);
     }
     return savedUnit;
+  }
+
+  async addPrice(
+    productUuid: string,
+    price: number,
+    unitUuid: string,
+    setAsDefault = false,
+    userId?: string,
+  ) {
+    const product = await this.findOne(productUuid);
+    if (!product) throw new BadRequestException('Product not found');
+
+    if (price <= 0) {
+      throw new BadRequestException('Price must be > 0');
+    }
+
+    let unit = await this.unitRepo.findOne({ where: { uuid: unitUuid } });
+    if (!unit) throw new BadRequestException('Unit not found');
+
+    const newPrice = this.priceRepo.create({
+      productUuid,
+      price,
+      unitUuid: unitUuid,
+      createdBy: userId,
+    });
+
+    const savedPrice = await this.priceRepo.save(newPrice);
+
+    if (setAsDefault) {
+      product.defaultPriceUuid = savedPrice.uuid;
+      await this.productRepo.save(product);
+    }
+    return savedPrice;
   }
 
   async addStock(productUuid: string, qty: number, userId?: string) {
