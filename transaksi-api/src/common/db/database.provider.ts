@@ -8,7 +8,7 @@ export const databaseProvider = [
       const dataSource = new DataSource({
         type: 'mysql',
         host: 'localhost',
-        port: 8889,
+        port: 3306,
         username: 'root',
         password: 'root',
         database: 'transaksi',
@@ -18,7 +18,7 @@ export const databaseProvider = [
           collation: 'utf8mb4_unicode_ci',
         },
         entities: [
-            __dirname + '/../**/*.entity{.ts,.js}',
+          __dirname + '/../**/*.entity{.ts,.js}',
         ],
         synchronize: true,
       });
