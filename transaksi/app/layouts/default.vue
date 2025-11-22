@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'; 
+import { ref, computed, onMounted } from 'vue'; 
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '~/stores/auth.store'; 
 
@@ -9,6 +9,29 @@ const authService = useAuthService();
 const authStore = useAuthStore();
 
 const storeName = computed(() => authStore.activeStore?.name || 'RetailApp');
+
+// --- [BARU] DARK MODE STATE & LOGIC ---
+const isDark = ref(false);
+
+const toggleDarkMode = () => {
+    isDark.value = !isDark.value;
+    if (process.client) {
+        // Toggle class 'dark' pada elemen <html>
+        document.documentElement.classList.toggle('dark', isDark.value);
+        localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
+    }
+};
+
+onMounted(() => {
+    // Inisialisasi tema saat mounting
+    if (process.client) {
+        const theme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        isDark.value = (theme === 'dark' || (!theme && prefersDark));
+        document.documentElement.classList.toggle('dark', isDark.value);
+    }
+});
+// ----------------------------------------
 
 // --- MENU STRUCTURE ---
 const items = ref([
@@ -28,18 +51,26 @@ const items = ref([
     },
     { 
         label: 'Menu', 
-        icon: 'pi pi-list',
-        key: 'transaksi',
+        icon: 'pi pi-list', 
+        key: 'menu',
         items: [
-            { label: 'Transaksi', icon: 'pi pi-wallet', route: '/transaction' },
-        ]
-    },
-    { 
-        label: 'Laporan', 
-        icon: 'pi pi-chart-bar',
-        key: 'laporan',
-        items: [
-            { label: 'Transaksi', icon: 'pi pi-chart-line', route: '/report' },
+            { 
+                label: 'Transaksi', 
+                icon: 'pi pi-wallet',
+                route: '/transaction', 
+                command: (event) => {
+                    router.push('/transaction');
+                }
+            },
+            { separator: true },
+            { 
+                label: 'Laporan', 
+                icon: 'pi pi-chart-bar', 
+                route: '/report', 
+                command: (event) => {
+                    router.push('/report');
+                }
+            },
         ]
     }
 ]);
@@ -70,11 +101,17 @@ const desktopMenuRef = ref();
 const desktopSubItems = ref([]);
 
 const toggleDesktopSubMenu = (event, item) => {
-    // Mapping item data ke format PrimeVue Menu
     desktopSubItems.value = item.items.map(sub => ({
         label: sub.label,
         icon: sub.icon,
-        command: () => router.push(sub.route)
+        command: () => {
+            if (sub.route) {
+                 router.push(sub.route);
+            } else if (sub.command) {
+                sub.command();
+            }
+        },
+        separator: sub.separator 
     }));
     desktopMenuRef.value.toggle(event);
 };
@@ -90,7 +127,14 @@ const onMobileNavClick = (event, item) => {
         mobileSubItems.value = item.items.map(sub => ({
             label: sub.label,
             icon: sub.icon,
-            command: () => router.push(sub.route)
+            command: () => {
+                if (sub.route) {
+                    router.push(sub.route);
+                } else if (sub.command) {
+                    sub.command();
+                }
+            },
+             separator: sub.separator
         }));
         mobileMenuRef.value.toggle(event);
     }
@@ -98,8 +142,9 @@ const onMobileNavClick = (event, item) => {
 
 // Cek Active Route (untuk highlight parent menu)
 const isRouteActive = (item) => {
-    if (item.route) return route.path === item.route;
-    if (item.items) return item.items.some(sub => route.path.startsWith(sub.route));
+    if (item.route) return route.path.startsWith(item.route) && item.route !== '/';
+    if (item.route === '/' && route.path === '/') return true;
+    if (item.items) return item.items.some(sub => sub.route && route.path.startsWith(sub.route));
     return false;
 };
 </script>
@@ -150,6 +195,17 @@ const isRouteActive = (item) => {
                 <div class="flex-1"></div>
 
                 <div class="flex items-center gap-2 pr-2 shrink-0">
+                    
+                    <Button 
+                        :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'" 
+                        text 
+                        rounded 
+                        :severity="isDark ? 'warning' : 'secondary'"
+                        class="!w-10 !h-10 text-white hover:bg-white/10" 
+                        @click="toggleDarkMode" 
+                        v-tooltip.bottom="'Toggle Dark Mode'" 
+                    />
+
                     <div class="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-white/10 rounded-full transition-colors"
                          @click="toggleProfile" aria-haspopup="true" aria-controls="profile_menu">
                          <span class="hidden md:block text-sm text-white font-medium mr-1">Halo, {{ authStore.user?.username || 'Admin' }}</span>
