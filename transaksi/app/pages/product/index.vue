@@ -13,7 +13,7 @@ import ProductCreateModal from '~/components/ProductCreateModal.vue';
 import ShelveCreateModal from '~/components/ShelveCreateModal.vue';
 
 // --- STATE ---
-const activeMainTab = ref('products'); // 'products' | 'shelves'
+const activeMainTab = ref('products'); // 'products' | 'categories' | 'shelves'
 
 // Refs ke Child Components (agar bisa panggil method refresh() mereka)
 const productListRef = ref(null);
@@ -66,54 +66,47 @@ const onShelveSaved = () => {
     showShelveModal.value = false;
 };
 
+// --- UTILS ---
+const getTabClass = (tabName) => {
+    return activeMainTab.value === tabName
+        ? 'global-tab-active' // Menggunakan class global baru
+        : 'global-tab-inactive'; // Menggunakan class global baru
+};
+
 definePageMeta({ layout: 'default' });
 </script>
 
 <template>
-    <div class="animate-fade-in p-4 min-h-screen bg-surface-50 dark:bg-surface-950">
+    <div class="h-[calc(100vh-5rem)]">
         <Toast />
         <ConfirmDialog />
 
-        <!-- NAVIGATION TABS -->
-        <div class="flex items-center gap-4 mb-6 border-b border-surface-200 dark:border-surface-700 pb-1">
+        <div class="flex items-end gap-3 mb-6 border-b border-surface-300 dark:border-surface-700">
 
-            <!-- Master Produk -->
             <button 
                 @click="activeMainTab = 'products'"
-                class="px-4 py-2 text-sm font-bold border-b-2 transition-all duration-200 flex items-center gap-2"
-                :class="activeMainTab === 'products'
-                    ? 'border-primary-500 text-primary-600 bg-primary-50/50 rounded-t-lg'
-                    : 'border-transparent text-surface-500 hover:text-surface-700'"
+                :class="getTabClass('products')"
             >
                 <i class="pi pi-box"></i> Master Produk
             </button>
 
-            <!-- Kategori (NEW TAB) -->
             <button 
                 @click="activeMainTab = 'categories'"
-                class="px-4 py-2 text-sm font-bold border-b-2 transition-all duration-200 flex items-center gap-2"
-                :class="activeMainTab === 'categories'
-                    ? 'border-primary-500 text-primary-600 bg-primary-50/50 rounded-t-lg'
-                    : 'border-transparent text-surface-500 hover:text-surface-700'"
+                :class="getTabClass('categories')"
             >
                 <i class="pi pi-tags"></i> Kategori
             </button>
 
-            <!-- Lokasi Rak -->
             <button 
                 @click="activeMainTab = 'shelves'"
-                class="px-4 py-2 text-sm font-bold border-b-2 transition-all duration-200 flex items-center gap-2"
-                :class="activeMainTab === 'shelves'
-                    ? 'border-primary-500 text-primary-600 bg-primary-50/50 rounded-t-lg'
-                    : 'border-transparent text-surface-500 hover:text-surface-700'"
+                :class="getTabClass('shelves')"
             >
-                <i class="pi pi-th-large"></i> Lokasi Rak / Shelves
+                <i class="pi pi-th-large"></i> Lokasi Rak
             </button>
 
         </div>
 
 
-        <!-- CONTENT AREA -->
         <div class="content-area">
             <KeepAlive>
             
@@ -157,6 +150,17 @@ definePageMeta({ layout: 'default' });
 </template>
 
 <style scoped>
+/* Base style untuk semua tabs */
+button {
+    @apply flex items-center gap-2 cursor-pointer outline-none;
+}
+
+.content-area {
+    /* Mengisi sisa ruang dan memastikan konten child tidak terpotong */
+    height: calc(100% - 70px); 
+    overflow: hidden;
+}
+
 .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out;
 }

@@ -1,5 +1,3 @@
-// pages/report/index.vue
-
 <script setup>
 import { ref, watch, onMounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -13,7 +11,6 @@ const route = useRoute();
 const router = useRouter();
 
 // State Tab (default: sale)
-// Gunakan query parameter 'tab' untuk sinkronisasi state
 const activeTab = ref(route.query.tab || 'sale');
 
 // Refs untuk memanggil fungsi refresh dari komponen anak
@@ -21,6 +18,14 @@ const saleRef = ref(null);
 const buyRef = ref(null);
 const graphRef = ref(null);
 
+// --- UTILS ---
+const getTabClass = (tabName) => {
+    return activeTab.value === tabName
+        ? 'global-tab-active'
+        : 'global-tab-inactive';
+};
+
+// --- LOGIC ---
 // Sinkronisasi Tab dengan URL
 watch(activeTab, (newTab) => {
     router.replace({ query: { tab: newTab } });
@@ -30,9 +35,9 @@ watch(activeTab, (newTab) => {
 watch(() => route.query.tab, async (newTab) => {
     activeTab.value = newTab || 'sale';
     
-    // Tunggu komponen dirender sebelum mencoba refresh
     await nextTick();
     
+    // Logic refresh data di tab yang aktif
     if (activeTab.value === 'sale' && saleRef.value && saleRef.value.refreshData) {
         saleRef.value.refreshData();
     } else if (activeTab.value === 'buy' && buyRef.value && buyRef.value.refreshData) {
@@ -43,7 +48,6 @@ watch(() => route.query.tab, async (newTab) => {
 });
 
 onMounted(() => {
-    // Pastikan tab diset dari URL saat pertama kali dimuat
     activeTab.value = route.query.tab || 'sale';
 });
 
@@ -56,41 +60,39 @@ definePageMeta({ layout: 'default' });
         <div class="flex items-center justify-between mb-4">
              <h1 class="text-3xl font-black text-surface-900 dark:text-surface-0 tracking-tight">Laporan & Analisis</h1>
              <div class="flex items-center gap-2">
-                <Button icon="pi pi-refresh" severity="secondary" outlined size="small" v-tooltip.left="'Refresh Data'" @click="route.query.tab === 'sale' ? saleRef.refreshData() : route.query.tab === 'buy' ? buyRef.refreshData() : graphRef.refreshData()" />
+                <Button 
+                    icon="pi pi-refresh" 
+                    severity="secondary" 
+                    outlined 
+                    size="small" 
+                    v-tooltip.left="'Refresh Data'" 
+                    @click="activeTab === 'sale' ? saleRef.refreshData() : activeTab === 'buy' ? buyRef.refreshData() : graphRef.refreshData()" 
+                />
              </div>
         </div>
 
-        <div class="flex items-center gap-4 mb-4 border-b border-surface-200 dark:border-surface-700">
+        <div class="flex items-end gap-3 mb-4 border-b border-surface-200 dark:border-surface-700">
             <button 
                 @click="activeTab = 'sale'"
-                class="px-4 py-2 text-sm font-bold border-b-2 transition-all duration-200"
-                :class="activeTab === 'sale'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'"
+                :class="getTabClass('sale')"
             >
                 <i class="pi pi-file-pdf mr-2"></i> Penjualan
             </button>
             <button 
                 @click="activeTab = 'buy'"
-                class="px-4 py-2 text-sm font-bold border-b-2 transition-all duration-200"
-                :class="activeTab === 'buy'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'"
+                :class="getTabClass('buy')"
             >
                 <i class="pi pi-shopping-bag mr-2"></i> Pembelian
             </button>
             <button 
                 @click="activeTab = 'graph'"
-                class="px-4 py-2 text-sm font-bold border-b-2 transition-all duration-200"
-                :class="activeTab === 'graph'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'"
+                :class="getTabClass('graph')"
             >
                 <i class="pi pi-chart-line mr-2"></i> Analisis Grafik
             </button>
         </div>
         
-        <div class="flex-1 overflow-y-auto">
+        <div class="flex-1 overflow-hidden">
             <KeepAlive>
                 <ReportSale 
                     v-if="activeTab === 'sale'" 
