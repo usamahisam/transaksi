@@ -18,6 +18,7 @@ const filters = ref({ global: { value: null, matchMode: 'contains' } });
 const fetchProducts = async () => {
     loading.value = true;
     try {
+        // Asumsi relasi di backend: prices/price, productCategory, category
         const data = await productService.getAllProducts();
         products.value = (data || []).map(p => ({
             ...p,
@@ -25,7 +26,7 @@ const fetchProducts = async () => {
             stock: p.stock || [],
             units: p.units || [],
             shelve: p.shelve || [],
-            // [BARU] Mapping Kategori dari relasi productCategory
+            // Mapping Kategori dari relasi productCategory
             categories: (p.productCategory || []).map(pc => pc.category?.name).filter(Boolean)
         }));
     } catch (err) {
@@ -87,7 +88,7 @@ defineExpose({ refresh: fetchProducts });
         </div>
 
         <div class="card bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 shadow-sm overflow-hidden">
-            <DataTable :value="products" :loading="loading" paginator :rows="10" dataKey="uuid" :filters="filters" stripedRows tableStyle="min-width: 80rem" class="text-sm" :globalFilterFields="['name', 'units.barcode']">
+            <DataTable :value="products" :loading="loading" paginator :rows="10" dataKey="uuid" :filters="filters" stripedRows tableStyle="min-width: 90rem" class="text-sm" :globalFilterFields="['name', 'units.barcode']">
                 <template #empty>
                     <div class="flex flex-col items-center justify-center py-12 text-surface-400">
                         <i class="pi pi-inbox text-5xl mb-3 opacity-30"></i>
@@ -95,7 +96,7 @@ defineExpose({ refresh: fetchProducts });
                     </div>
                 </template>
                 
-                <Column field="name" header="Informasi Produk" sortable style="width: 20%" class="align-top">
+                <Column field="name" header="Informasi Produk" sortable style="width: 18%" class="align-top">
                     <template #body="slotProps">
                         <div class="flex gap-3 py-2">
                             <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/50 dark:to-blue-800/30 flex items-center justify-center text-blue-600 font-bold text-xl shadow-sm border border-blue-100 shrink-0">
@@ -109,12 +110,12 @@ defineExpose({ refresh: fetchProducts });
                     </template>
                 </Column>
 
-                <Column header="Kategori" style="width: 12%" class="align-top">
+                <Column header="Kategori" style="width: 10%" class="align-top">
                     <template #body="slotProps">
                         <div class="flex flex-wrap gap-1.5 py-2">
                             <template v-if="slotProps.data.categories && slotProps.data.categories.length > 0">
                                 <span v-for="cat in slotProps.data.categories" :key="cat" 
-                                      class="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-100 dark:border-orange-800 rounded text-[11px] font-medium">
+                                        class="inline-flex items-center gap-1 px-2 py-1 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-100 dark:border-orange-800 rounded text-[11px] font-medium">
                                     <i class="pi pi-tag text-[9px]"></i>
                                     {{ cat }}
                                 </span>
@@ -126,12 +127,12 @@ defineExpose({ refresh: fetchProducts });
                     </template>
                 </Column>
 
-                <Column header="Lokasi Rak" style="width: 15%" class="align-top">
+                <Column header="Lokasi Rak" style="width: 12%" class="align-top">
                     <template #body="slotProps">
                         <div class="flex flex-wrap gap-1.5 py-2">
                             <template v-if="getUniqueShelves(slotProps.data).length > 0">
                                 <span v-for="shelfName in getUniqueShelves(slotProps.data)" :key="shelfName" 
-                                      class="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800 rounded text-[11px] font-medium">
+                                        class="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800 rounded text-[11px] font-medium">
                                     <i class="pi pi-map-marker text-[9px]"></i>
                                     {{ shelfName }}
                                 </span>
@@ -143,11 +144,13 @@ defineExpose({ refresh: fetchProducts });
                     </template>
                 </Column>
 
-                <Column header="Detail Varian (Satuan, Harga, Stok)" style="width: 53%" class="align-top">
+                <Column header="Detail Varian (Satuan, Harga, Stok)" style="width: 50%" class="align-top">
                     <template #body="slotProps">
                         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 py-2">
                             <div v-for="u in slotProps.data.units" :key="u.uuid" class="relative bg-surface-50 dark:bg-surface-800/50 border rounded-lg p-3 flex flex-col gap-2 hover:shadow-md transition-all" :class="u.uuid === slotProps.data.defaultUnitUuid ? 'border-blue-300 ring-1 ring-blue-100' : 'border-surface-200 dark:border-surface-700'">
+                                
                                 <div v-if="u.uuid === slotProps.data.defaultUnitUuid" class="absolute top-0 right-0"><span class="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-bl-lg rounded-tr-lg font-bold shadow-sm">DEFAULT</span></div>
+                                
                                 <div class="flex justify-between items-center">
                                     <div class="flex items-center gap-2">
                                         <span class="font-bold text-sm text-surface-800 dark:text-surface-100">{{ u.unitName }}</span>
@@ -158,14 +161,28 @@ defineExpose({ refresh: fetchProducts });
                                         <span class="text-sm font-black" :class="getStockForUnit(slotProps.data.stock, u.uuid) > 0 ? 'text-surface-800 dark:text-surface-200' : 'text-red-500'">{{ getStockForUnit(slotProps.data.stock, u.uuid) }}</span>
                                     </div>
                                 </div>
+                                
                                 <div class="flex items-center gap-2 text-xs text-surface-600 bg-white dark:bg-surface-900 p-1.5 rounded border border-dashed border-surface-200 dark:border-surface-700">
                                     <i class="pi pi-barcode text-surface-400"></i>
                                     <span class="font-mono truncate" :title="u.barcode || 'Tanpa Barcode'">{{ u.barcode || 'Tanpa Barcode' }}</span>
                                 </div>
+                                
                                 <div class="space-y-1 pt-1 border-t border-surface-200 dark:border-surface-700">
-                                    <div v-for="p in getPricesForUnit(slotProps.data.prices, u.uuid)" :key="p.uuid" class="flex justify-between text-xs">
-                                        <span class="text-surface-500">{{ p.name || 'Umum' }}</span>
-                                        <span class="font-bold text-primary-600">{{ formatCurrency(p.price) }}</span>
+                                    <div v-for="p in getPricesForUnit(slotProps.data.prices, u.uuid)" :key="p.uuid" class="flex flex-col border-b last:border-b-0 border-surface-100 dark:border-surface-800 pb-1 pt-0.5">
+                                        
+                                        <div class="flex justify-between text-xs items-center">
+                                            <span class="text-surface-600 dark:text-surface-300 font-semibold">{{ p.name || 'Umum' }}</span>
+                                            <span class="font-bold text-primary-600 text-sm">{{ formatCurrency(p.price) }}</span>
+                                        </div>
+
+                                        <div v-if="p.minWholesaleQty > 0" class="flex justify-between text-[10px] text-green-600 dark:text-green-400 items-center">
+                                            <span class="font-medium flex items-center gap-1">
+                                                <i class="pi pi-box"></i> Min. Grosir:
+                                            </span>
+                                            <span class="font-bold">
+                                                {{ p.minWholesaleQty }} {{ u.unitName }}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

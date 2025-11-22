@@ -9,25 +9,25 @@ import {
 } from 'typeorm';
 import { UserEntity } from '../user/user.entity';
 
-export enum Role {
+export enum UserRole {
   ADMIN = 'ADMIN',
   MANAGER = 'MANAGER',
   CASHIER = 'CASHIER',
   INVENTORY = 'INVENTORY',
 }
 
-@Entity('role')
-export class RoleEntity {
+@Entity('user_role')
+export class UserRoleEntity {
   @PrimaryGeneratedColumn('uuid')
   uuid: string;
-  
+
   @Column({
     type: 'enum',
-    enum: Role,
-    default: Role.CASHIER,
+    enum: UserRole,
+    default: UserRole.CASHIER,
     unique: true
   })
-  role: Role;
+  role: UserRole;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

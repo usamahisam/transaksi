@@ -12,8 +12,8 @@ import {
 import { ProductStockEntity } from '../product_stock/product_stock.entity';
 import { ProductUnitEntity } from '../product_unit/product_unit.entity';
 import { ProductPriceEntity } from '../product_price/product_price.entity';
-import { ProductShelveEntity } from '../product_shelve/product_shelve.entity';
-import { ProductCategoryEntity } from '../product_category/product_category.entity';
+import { ProductShelvePivotEntity } from '../product_shelve_pivot/product_shelve_pivot.entity';
+import { ProductCategoryPivotEntity } from '../product_category_pivot/product_category_pivot.entity';
 import { UserEntity } from '../user/user.entity';
 import { StoreEntity } from '../store/store.entity';
 
@@ -49,22 +49,22 @@ export class ProductEntity {
 
   @Column({ name: 'updated_by', type: 'uuid', nullable: true })
   updatedBy?: string;
-  
+
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'updated_by' })
   updatedByUser?: UserEntity;
 
   @Column({ name: 'deleted_by', type: 'uuid', nullable: true })
   deletedBy?: string;
-  
+
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'deleted_by' })
   deletedByUser?: UserEntity;
-  
+
   @Column({ name: 'store_uuid', type: 'uuid' })
   storeUuid: string;
 
-  @ManyToOne(() => StoreEntity, { onDelete: 'CASCADE' }) 
+  @ManyToOne(() => StoreEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'store_uuid' })
   store: StoreEntity;
 
@@ -77,9 +77,9 @@ export class ProductEntity {
   @OneToMany(() => ProductPriceEntity, (price) => price.product)
   price: ProductPriceEntity[];
 
-  @OneToMany(() => ProductShelveEntity, (shelve) => shelve.product)
-  shelve: ProductShelveEntity[];
+  @OneToMany(() => ProductShelvePivotEntity, (shelve) => shelve.product)
+  shelve: ProductShelvePivotEntity[];
 
-  @OneToMany(() => ProductCategoryEntity, (category) => category.product)
-  productCategory: ProductCategoryEntity[];
+  @OneToMany(() => ProductCategoryPivotEntity, (category) => category.product)
+  productCategory: ProductCategoryPivotEntity[];
 }

@@ -1,16 +1,16 @@
 import { Injectable, Inject, NotFoundException } from "@nestjs/common";
-import { ShelveEntity } from "src/common/entities/shelve/shelve.entity";
 import { Repository, DataSource } from "typeorm";
 import { CreateShelveDto, UpdateShelveDto } from "./dto/create-shelve.dto";
+import { ProductShelveEntity } from "src/common/entities/product_shelve/product_shelve.entity";
 
 @Injectable()
 export class ShelveService {
   constructor(
-    @Inject('SHELVE_REPOSITORY')
-    private readonly shelveRepo: Repository<ShelveEntity>,
+    @Inject('PRODUCT_SHELVE_REPOSITORY')
+    private readonly shelveRepo: Repository<ProductShelveEntity>,
     @Inject('DATA_SOURCE')
-    private readonly dataSource: DataSource, 
-  ) {}
+    private readonly dataSource: DataSource,
+  ) { }
 
   async create(payload: CreateShelveDto, userId: string) {
     const newShelve = this.shelveRepo.create({
@@ -36,7 +36,7 @@ export class ShelveService {
         'productShelves',
         'productShelves.product',
         'productShelves.unit'
-      ] 
+      ]
     });
 
     if (!shelve) {
@@ -52,7 +52,7 @@ export class ShelveService {
     if (payload.name) shelve.name = payload.name;
     if (payload.description) shelve.description = payload.description;
     if (payload.capacity) shelve.capacity = payload.capacity;
-    
+
     shelve.updatedBy = userId;
 
     return await this.shelveRepo.save(shelve);
@@ -60,7 +60,7 @@ export class ShelveService {
 
   async remove(uuid: string, userId: string) {
     const shelve = await this.findOne(uuid);
-    
+
     // Update deletedBy sebelum soft delete
     shelve.deletedBy = userId;
     await this.shelveRepo.save(shelve);

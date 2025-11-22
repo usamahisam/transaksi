@@ -10,21 +10,16 @@ import {
 } from 'typeorm';
 import { ProductEntity } from '../product/product.entity';
 import { ProductUnitEntity } from '../product_unit/product_unit.entity';
+import { ProductShelveEntity } from '../product_shelve/product_shelve.entity';
 import { UserEntity } from '../user/user.entity';
 
-@Entity('product_price')
-export class ProductPriceEntity {
+@Entity('product_shelve_pivot')
+export class ProductShelvePivotEntity {
   @PrimaryGeneratedColumn('uuid')
   uuid: string;
 
-  @Column({ length: 255 })
-  name: string;
-
-  @Column({ type: 'double', default: 0 })
-  price: number;
-
-  @Column({ name: 'min_wholesale_qty', type: 'int', default: 0 })
-  minWholesaleQty: number;
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  qty: number;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
@@ -56,7 +51,14 @@ export class ProductPriceEntity {
   @JoinColumn({ name: 'deleted_by' })
   deletedByUser?: UserEntity;
 
-  @ManyToOne(() => ProductEntity, (product) => product.price, {
+  @ManyToOne(() => ProductShelveEntity, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'shelve_uuid' })
+  shelve: ProductShelveEntity;
+
+  @Column({ name: 'shelve_uuid', type: 'uuid', nullable: true })
+  shelveUuid?: string;
+
+  @ManyToOne(() => ProductEntity, (product) => product.shelve, { // Pastikan relasi di ProductEntity bernama 'shelve'
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'product_uuid' })

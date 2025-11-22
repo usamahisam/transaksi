@@ -7,26 +7,26 @@ import { StoreSettingEntity } from 'src/common/entities/store_setting/store_sett
 import { UserEntity } from 'src/common/entities/user/user.entity';
 import { AuthService } from 'src/module/auth/auth.service';
 import { SaveSettingDto } from './dto/save-setting.dto';
-import { RoleEntity, Role } from 'src/common/entities/role/role.entity';
+import { UserRoleEntity, UserRole } from 'src/common/entities/user_role/user_role.entity';
 
 @Injectable()
 export class StoreService {
   constructor(
     @Inject('DATA_SOURCE') private readonly dataSource: DataSource,
     private readonly authService: AuthService,
-  ) {}
+  ) { }
 
   async installStore(dto: InstallStoreDto) {
     return await this.dataSource.transaction(async (manager) => {
       // 0. PREPARE ROLE ADMIN
-      let adminRole = await manager.findOne(RoleEntity, {
-        where: { role: Role.ADMIN },
+      let adminUserRole = await manager.findOne(UserRoleEntity, {
+        where: { role: UserRole.ADMIN },
       });
-      if (!adminRole) {
-        adminRole = manager.create(RoleEntity, {
-          role: Role.ADMIN,
+      if (!adminUserRole) {
+        adminUserRole = manager.create(UserRoleEntity, {
+          role: UserRole.ADMIN,
         });
-        await manager.save(adminRole);
+        await manager.save(adminUserRole);
       }
 
       // 1. CREATE USER
@@ -35,7 +35,7 @@ export class StoreService {
         username: dto.username,
         password: hashedPassword,
         email: dto.email,
-        roles: [adminRole]
+        roles: [adminUserRole]
       });
       const savedUser = await manager.save(newUser);
 
@@ -49,9 +49,9 @@ export class StoreService {
       const savedStore = await manager.save(newStore);
 
       // 3. LINK USER KE STORE
-      savedUser.defaultStore = savedStore; 
-      savedUser.stores = [savedStore]; 
-      await manager.save(savedUser); 
+      savedUser.defaultStore = savedStore;
+      savedUser.stores = [savedStore];
+      await manager.save(savedUser);
 
       // 4. SETTINGS
       if (dto.settings && dto.settings.length > 0) {
@@ -111,11 +111,11 @@ export class StoreService {
         address: store.address,
         phone: store.phone,
         settings: formattedSettings,
-        isActive: isActive, 
+        isActive: isActive,
       };
     });
   }
-  
+
   async saveSettings(userId: string, storeUuid: string, dto: SaveSettingDto) {
     if (!storeUuid) throw new BadRequestException('Active Store ID not found in token');
 
@@ -129,7 +129,7 @@ export class StoreService {
       if (dto.name) store.name = dto.name;
       if (dto.address) store.address = dto.address;
       if (dto.phone) store.phone = dto.phone;
-      
+
       store.updatedBy = userId;
       await manager.save(store);
 

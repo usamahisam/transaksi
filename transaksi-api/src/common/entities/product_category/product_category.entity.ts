@@ -5,17 +5,18 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     DeleteDateColumn,
-    JoinColumn,
+    OneToMany,
     ManyToOne,
 } from 'typeorm';
-import { ProductEntity } from '../product/product.entity';
-import { CategoryEntity } from '../category/category.entity';
-import { UserEntity } from '../user/user.entity';
+import { ProductCategoryPivotEntity } from '../product_category_pivot/product_category_pivot.entity';
 
 @Entity('product_category')
 export class ProductCategoryEntity {
     @PrimaryGeneratedColumn('uuid')
     uuid: string;
+
+    @Column({ length: 500 })
+    name: string;
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
     createdAt: Date;
@@ -28,38 +29,25 @@ export class ProductCategoryEntity {
 
     @Column({ name: 'created_by', type: 'uuid', nullable: true })
     createdBy?: string;
-    
-    @ManyToOne(() => UserEntity)
-    @JoinColumn({ name: 'created_by' })
-    createdByUser?: UserEntity;
 
     @Column({ name: 'updated_by', type: 'uuid', nullable: true })
     updatedBy?: string;
-      
-    @ManyToOne(() => UserEntity)
-    @JoinColumn({ name: 'updated_by' })
-    updatedByUser?: UserEntity;
 
     @Column({ name: 'deleted_by', type: 'uuid', nullable: true })
     deletedBy?: string;
-      
-    @ManyToOne(() => UserEntity)
-    @JoinColumn({ name: 'deleted_by' })
-    deletedByUser?: UserEntity;
 
-    @ManyToOne(() => CategoryEntity, { onDelete: 'SET NULL' })
-    @JoinColumn({ name: 'category_uuid' })
-    category: CategoryEntity;
-
-    @Column({ name: 'category_uuid', type: 'uuid', nullable: true })
-    categoryUuid?: string;
-
-    @ManyToOne(() => ProductEntity, (product) => product.productCategory, {
-        onDelete: 'CASCADE',
+    @ManyToOne(() => ProductCategoryEntity, (cat) => cat.children, {
+        nullable: true,
+        onDelete: 'SET NULL',
     })
-    @JoinColumn({ name: 'product_uuid' })
-    product: ProductEntity;
+    parent: ProductCategoryEntity | null;
 
-    @Column({ name: 'product_uuid', type: 'uuid' })
-    productUuid: string;
+    @OneToMany(() => ProductCategoryEntity, (cat) => cat.parent)
+    children: ProductCategoryEntity[];
+
+    @OneToMany(() => ProductCategoryPivotEntity, (ps) => ps.category)
+    productCategorys: ProductCategoryPivotEntity[];
+
+    // [NEW] Property virtual untuk menampung jumlah item (tidak masuk database)
+    totalItems?: number;
 }

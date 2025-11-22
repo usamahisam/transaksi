@@ -8,7 +8,9 @@ import { productStockProvider } from 'src/common/entities/product_stock/product_
 import { productUnitProvider } from 'src/common/entities/product_unit/product_unit.provider';
 import { productPriceProvider } from 'src/common/entities/product_price/product_price.provider';
 import { productShelveProvider } from 'src/common/entities/product_shelve/product_shelve.provider';
-import { shelveProvider } from 'src/common/entities/shelve/shelve.provider';
+import { productShelvePivotProvider } from 'src/common/entities/product_shelve_pivot/product_shelve_pivot.provider';
+import { productCategoryProvider } from 'src/common/entities/product_category/product_category.provider';
+import { productCategoryPivotProvider } from 'src/common/entities/product_category_pivot/product_category_pivot.provider';
 
 @Module({
   imports: [DatabaseModule],
@@ -18,10 +20,12 @@ import { shelveProvider } from 'src/common/entities/shelve/shelve.provider';
     ...productUnitProvider,
     ...productStockProvider,
     ...productPriceProvider,
-    ...shelveProvider,
+    ...productCategoryProvider,
+    ...productCategoryPivotProvider,
     ...productShelveProvider,
+    ...productShelvePivotProvider,
     ProductService,
   ],
   exports: [ProductService],
 })
-export class ProductModule {}
+export class ProductModule { }

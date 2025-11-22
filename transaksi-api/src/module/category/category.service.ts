@@ -1,13 +1,13 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from "@nestjs/common";
-import { CategoryEntity } from "src/common/entities/category/category.entity";
+import { ProductCategoryEntity } from "src/common/entities/product_category/product_category.entity";
 import { Repository, DataSource } from "typeorm";
 import { CreateCategoryDto, UpdateCategoryDto } from "./dto/create-category.dto";
 
 @Injectable()
 export class CategoryService {
   constructor(
-    @Inject('CATEGORY_REPOSITORY')
-    private readonly categoryRepo: Repository<CategoryEntity>,
+    @Inject('PRODUCT_CATEGORY_REPOSITORY')
+    private readonly categoryRepo: Repository<ProductCategoryEntity>,
     @Inject('DATA_SOURCE')
     private readonly dataSource: DataSource,
   ) { }

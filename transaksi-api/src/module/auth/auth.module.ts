@@ -6,21 +6,21 @@ import { userProvider } from 'src/common/entities/user/user.provider';
 import { AtStrategy } from 'src/common/strategies/at.strategy';
 import { RtStrategy } from 'src/common/strategies/rt.strategy';
 import { AuthService } from './auth.service';
-import { roleProvider } from 'src/common/entities/role/role.provider';
+import { userRoleProvider } from 'src/common/entities/user_role/user_role.provider';
 
 @Module({
   imports: [
-    DatabaseModule, 
-    JwtModule.register({}), 
+    DatabaseModule,
+    JwtModule.register({}),
   ],
   controllers: [AuthController],
   providers: [
-    AuthService, 
-    AtStrategy, 
+    AuthService,
+    AtStrategy,
     RtStrategy,
     ...userProvider,
-    ...roleProvider,
+    ...userRoleProvider,
   ],
   exports: [AuthService],
 })
-export class AuthModule {}
+export class AuthModule { }

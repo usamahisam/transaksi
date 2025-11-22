@@ -76,8 +76,8 @@ const loadProductData = async (uuid) => {
 
         // [BARU] 2. Isi Kategori
         // Backend mengirim array 'productCategorys', kita ambil uuid kategorinya saja
-        if (data.productCategorys && Array.isArray(data.productCategorys)) {
-            product.categoryUuids = data.productCategorys.map(pc => pc.category?.uuid).filter(Boolean);
+        if (data.productCategory && Array.isArray(data.productCategory)) {
+            product.categoryUuids = data.productCategory.map(pc => pc.category?.uuid).filter(Boolean);
         } else {
             product.categoryUuids = [];
         }
@@ -101,6 +101,8 @@ const loadProductData = async (uuid) => {
             unitTempId: p.unitUuid,
             name: p.name,
             price: Number(p.price),
+            // [MODIFIKASI] Ambil Minimal Grosir
+            minWholesaleQty: Number(p.minWholesaleQty) || 0,
             isDefault: data.defaultPriceUuid === p.uuid
         }));
 
@@ -139,7 +141,8 @@ const initForm = () => {
     product.categoryUuids = []; // [BARU] Reset kategori
     const tempId = Date.now();
     configUnits.value = [{ tempId, unitName: 'PCS', multiplier: 1, barcode: '', isDefault: true }];
-    configPrices.value = [{ tempId: tempId + 1, unitTempId: tempId, name: 'Umum', price: 0, isDefault: true }];
+    // [MODIFIKASI] Tambahkan minWholesaleQty: 0
+    configPrices.value = [{ tempId: tempId + 1, unitTempId: tempId, name: 'Umum', price: 0, minWholesaleQty: 0, isDefault: true }]; 
     syncStocks();
 };
 
@@ -178,13 +181,14 @@ watch(configUnits, () => syncStocks(), { deep: true });
 const addUnitRow = () => {
     const newId = Date.now();
     configUnits.value.push({ tempId: newId, unitName: 'PCS', multiplier: 1, barcode: '', isDefault: configUnits.value.length === 0 });
-    configPrices.value.push({ tempId: newId + 1, unitTempId: newId, name: 'Umum', price: 0, isDefault: true });
+    // [MODIFIKASI] Tambahkan minWholesaleQty: 0
+    configPrices.value.push({ tempId: newId + 1, unitTempId: newId, name: 'Umum', price: 0, minWholesaleQty: 0, isDefault: true });
 };
 
 const removeUnitRow = (index) => {
     if (configUnits.value.length === 1) {
-         toast.add({ severity: 'warn', summary: 'Warning', detail: 'Minimal harus ada 1 satuan.', life: 2000 });
-         return;
+           toast.add({ severity: 'warn', summary: 'Warning', detail: 'Minimal harus ada 1 satuan.', life: 2000 });
+           return;
     }
     const removed = configUnits.value[index];
     configUnits.value.splice(index, 1);
@@ -194,7 +198,8 @@ const setUnitDefault = (index) => { configUnits.value.forEach((u, i) => u.isDefa
 
 const addPriceRow = () => {
     const defaultUnitId = configUnits.value[0]?.tempId;
-    configPrices.value.push({ tempId: Date.now(), unitTempId: defaultUnitId, name: '', price: 0, isDefault: false });
+    // [MODIFIKASI] Tambahkan minWholesaleQty: 0
+    configPrices.value.push({ tempId: Date.now(), unitTempId: defaultUnitId, name: '', price: 0, minWholesaleQty: 0, isDefault: false });
 };
 const removePriceRow = (index) => { configPrices.value.splice(index, 1); };
 const setPriceDefault = (index) => { configPrices.value.forEach((p, i) => p.isDefault = (i === index)); };
@@ -229,6 +234,8 @@ const saveProduct = async () => {
                 unitTempId: p.unitTempId, 
                 name: p.name || 'Umum',
                 price: p.price,
+                // [MODIFIKASI] Kirim Minimal Grosir
+                minWholesaleQty: p.minWholesaleQty || 0,
                 isDefault: p.isDefault
             })),
             stocks: configStocks.value.map(s => ({
@@ -355,6 +362,7 @@ const closeDialog = () => emit('update:visible', false);
                             <th class="p-2 w-10 text-center border-b dark:border-surface-700">Def</th>
                             <th class="p-2 w-40 border-b dark:border-surface-700">Nama Harga</th>
                             <th class="p-2 w-32 border-b dark:border-surface-700">Satuan</th>
+                            <th class="p-2 w-28 border-b dark:border-surface-700 text-center">Min Grosir</th>
                             <th class="p-2 border-b dark:border-surface-700">Nominal (Rp)</th>
                             <th class="p-2 w-8 text-center border-b dark:border-surface-700"></th>
                         </tr>
@@ -365,6 +373,9 @@ const closeDialog = () => emit('update:visible', false);
                             <td class="p-2 align-middle"><InputText v-model="p.name" class="w-full !h-8 !text-xs !p-1" placeholder="Cth: Umum" /></td>
                             <td class="p-2 align-middle">
                                 <Dropdown v-model="p.unitTempId" :options="configUnits" optionLabel="unitName" optionValue="tempId" class="w-full !h-8 text-xs compact-input" :pt="{ input: { class: '!py-1 !px-2' } }" />
+                            </td>
+                            <td class="p-2 align-middle">
+                                <InputNumber v-model="p.minWholesaleQty" :min="0" class="w-full !h-8" inputClass="!text-xs !text-center !p-1" placeholder="0" />
                             </td>
                             <td class="p-2 align-middle">
                                 <InputNumber v-model="p.price" mode="currency" currency="IDR" locale="id-ID" class="w-full !h-8" inputClass="!text-xs !text-right !p-1" />
