@@ -9,8 +9,7 @@ import { ProductModule } from '../product/product.module';
 
 @Module({
   imports: [
-    DatabaseModule,
-    ProductModule
+    DatabaseModule
   ],
   controllers: [JournalController],
   providers: [
@@ -18,5 +17,6 @@ import { ProductModule } from '../product/product.module';
     ...journalDetailProvider,
     JournalService,
   ],
+  exports: [JournalService],
 })
-export class JournalModule {}
+export class JournalModule { }

@@ -1,11 +1,12 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { ProductEntity } from 'src/common/entities/product/product.entity';
-import { ProductStockEntity } from 'src/common/entities/product_stock/product_stock.entity';
 import { ProductUnitEntity, ProductUnitEnum } from 'src/common/entities/product_unit/product_unit.entity';
 import { ProductPriceEntity } from 'src/common/entities/product_price/product_price.entity';
 import { ProductShelvePivotEntity } from 'src/common/entities/product_shelve_pivot/product_shelve_pivot.entity';
-import { ProductCategoryPivotEntity } from 'src/common/entities/product_category_pivot/product_category_pivot.entity'; // Pastikan import ini ada
+import { ProductCategoryPivotEntity } from 'src/common/entities/product_category_pivot/product_category_pivot.entity';
+import { JournalService } from '../journal/journal.service';
+import { JournalDetailEntity } from 'src/common/entities/journal_detail/journal_detail.entity'; // Import untuk Query Stok
 
 @Injectable()
 export class ProductService {
@@ -14,22 +15,64 @@ export class ProductService {
     private readonly productRepo: Repository<ProductEntity>,
     @Inject('PRODUCT_UNIT_REPOSITORY')
     private readonly unitRepo: Repository<ProductUnitEntity>,
-    @Inject('PRODUCT_STOCK_REPOSITORY')
-    private readonly stokRepo: Repository<ProductStockEntity>,
     @Inject('PRODUCT_PRICE_REPOSITORY')
     private readonly priceRepo: Repository<ProductPriceEntity>,
     @Inject('DATA_SOURCE')
     private readonly dataSource: DataSource,
+    private readonly journalService: JournalService,
   ) { }
 
   // ==========================================================
-  // CREATE PRODUCT (With Multi Category & Shelves)
+  // [PERBAIKAN KRITIS] HELPER: Calculate Stock from Journal Details
+  // ==========================================================
+  private async calculateStockForUnits(
+    productUnits: ProductUnitEntity[],
+    manager: EntityManager,
+  ): Promise<Map<string, number>> {
+    if (!productUnits || productUnits.length === 0) {
+      return new Map();
+    }
+    const unitUuids = productUnits.map(u => u.uuid);
+
+    // Menggunakan SUBSTRING_INDEX(detail.key, '_', -1) untuk mendapatkan UUID unit terakhir
+    // Ini lebih andal daripada kombinasi SUBSTR/INSTR yang kompleks pada MySQL.
+    const rawData = await manager.getRepository(JournalDetailEntity).createQueryBuilder('detail')
+      .select("SUBSTRING_INDEX(detail.key, '_', -1)", 'unitUuid')
+      .addSelect(
+        `SUM(
+                CASE 
+                    WHEN detail.key LIKE 'stok_plus_%' THEN CAST(detail.value AS DECIMAL(10,2))
+                    WHEN detail.key LIKE 'stok_min_%' THEN -CAST(detail.value AS DECIMAL(10,2))
+                    ELSE 0
+                END
+            )`,
+        'totalQty'
+      )
+      // [PERBAIKAN] Filtering berdasarkan awal key dan Unit UUID yang diekstrak
+      .where(`(detail.key LIKE 'stok_plus_%' OR detail.key LIKE 'stok_min_%')`)
+      .andWhere(`SUBSTRING_INDEX(detail.key, '_', -1) IN (:...unitUuids)`, { unitUuids })
+      .groupBy('unitUuid')
+      .getRawMany();
+
+    const stockMap = new Map<string, number>();
+    rawData.forEach(row => {
+      // Menggunakan parseFloat untuk memastikan hasil adalah angka
+      if (row.unitUuid) {
+        stockMap.set(row.unitUuid, parseFloat(row.totalQty) || 0);
+      }
+    });
+
+    return stockMap;
+  }
+
+  // ==========================================================
+  // CREATE PRODUCT (Stok Awal ke Journal)
   // ==========================================================
   async create(payload: any) {
-    const { name, userId, units, prices, stocks, categoryUuids, storeUuid } = payload;
+    const { name, userId, units, prices, stocks, stockAdjustments, categoryUuids, storeUuid } = payload;
 
     return await this.dataSource.transaction(async (manager) => {
-      // 1. Create Product
+      // 1. Create Product & Categories (Logika lama)
       const newProduct = manager.create(ProductEntity, {
         name,
         createdBy: userId,
@@ -37,7 +80,6 @@ export class ProductService {
       });
       const savedProduct = await manager.save(newProduct);
 
-      // [BARU] 1.1. Process Categories (Multi Category)
       if (categoryUuids && Array.isArray(categoryUuids) && categoryUuids.length > 0) {
         for (const catUuid of categoryUuids) {
           const prodCat = manager.create(ProductCategoryPivotEntity, {
@@ -51,11 +93,9 @@ export class ProductService {
 
       let defaultUnitUuid: string | null = null;
       let defaultPriceUuid: string | null = null;
+      const unitUuidMap = new Map<any, string>();
 
-      // Map untuk menghubungkan tempId dari frontend ke UUID asli database
-      const unitUuidMap = new Map<number, string>();
-
-      // 2. Process Units
+      // 2. Process Units (Simpan Mapping)
       for (const u of units) {
         const newUnit = manager.create(ProductUnitEntity, {
           productUuid: savedProduct.uuid,
@@ -70,7 +110,7 @@ export class ProductService {
         if (u.isDefault) defaultUnitUuid = savedUnit.uuid;
       }
 
-      // 3. Process Prices
+      // 3. Process Prices (Logika lama)
       for (const p of prices) {
         const realUnitUuid = unitUuidMap.get(p.unitTempId);
         if (realUnitUuid) {
@@ -83,28 +123,29 @@ export class ProductService {
             createdBy: userId,
             isDefault: p.isDefault || false
           });
-          const savedPrice = await manager.save(newPrice);
-          if (p.isDefault) defaultPriceUuid = savedPrice.uuid;
+          await manager.save(newPrice);
+          if (p.isDefault) defaultPriceUuid = newPrice.uuid;
         }
       }
 
-      // 4. Process Stocks (Inventory Total) & Shelves (Lokasi Rak)
+      // 4. [BARU] Catat Stok Awal ke Journal
+      if (stockAdjustments && Array.isArray(stockAdjustments) && stockAdjustments.length > 0) {
+        const mappedAdjustments = stockAdjustments.map(adj => {
+          const realUnitUuid = unitUuidMap.get(adj.unitUuid) || adj.unitUuid;
+          return {
+            ...adj,
+            productUuid: savedProduct.uuid,
+            unitUuid: realUnitUuid,
+            oldQty: 0
+          }
+        });
+        await this.journalService.processStockAdjustment(mappedAdjustments, userId, manager);
+      }
+
+      // 5. Process Shelves (Logika lama)
       if (stocks && stocks.length > 0) {
         for (const s of stocks) {
           const realUnitUuid = unitUuidMap.get(s.unitTempId);
-
-          // A. Simpan Stok Global (Ledger)
-          if (realUnitUuid && s.qty > 0) {
-            const newStock = manager.create(ProductStockEntity, {
-              productUuid: savedProduct.uuid,
-              unitUuid: realUnitUuid,
-              qty: s.qty,
-              createdBy: userId
-            });
-            await manager.save(newStock);
-          }
-
-          // B. Simpan Alokasi Rak (Allocations)
           if (realUnitUuid && s.allocations && s.allocations.length > 0) {
             for (const alloc of s.allocations) {
               if (alloc.shelfUuid && alloc.qty > 0) {
@@ -122,42 +163,39 @@ export class ProductService {
         }
       }
 
-      // 5. Set Defaults back to Product
+      // 6. Set Defaults & Return
       if (defaultUnitUuid) savedProduct.defaultUnitUuid = defaultUnitUuid;
       if (defaultPriceUuid) savedProduct.defaultPriceUuid = defaultPriceUuid;
       await manager.save(savedProduct);
 
-      return savedProduct;
+      // Return dengan data stok terhitung
+      return await this.findOne(savedProduct.uuid, storeUuid);
     });
   }
 
   // ==========================================================
-  // UPDATE PRODUCT (Fix: Category & Shelves)
+  // UPDATE PRODUCT (Stok Penyesuaian ke Journal)
   // ==========================================================
   async update(uuid: string, payload: any, userId: string, storeUuid?: string) {
-    const { name, units, prices, stocks, categoryUuids } = payload;
+    const { name, units, prices, stocks, stockAdjustments, categoryUuids } = payload;
 
     return await this.dataSource.transaction(async (manager) => {
       const product = await manager.findOne(ProductEntity, { where: { uuid } });
       if (!product) throw new BadRequestException('Produk tidak ditemukan');
 
-      // 1. Update Nama
+      // 1. Update Nama & Kategori (Logika lama)
       product.name = name;
       product.updatedBy = userId;
       await manager.save(product);
 
-      // [BARU] 1.1 Update Categories (Full Sync: Delete All -> Insert New)
-      if (categoryUuids !== undefined) { // Hanya jika field dikirim
-        // Hapus mapping kategori lama
+      if (categoryUuids !== undefined) {
         await manager.delete(ProductCategoryPivotEntity, { productUuid: uuid });
-
-        // Insert baru
         if (Array.isArray(categoryUuids) && categoryUuids.length > 0) {
           for (const catUuid of categoryUuids) {
             const prodCat = manager.create(ProductCategoryPivotEntity, {
               productUuid: uuid,
               categoryUuid: catUuid,
-              createdBy: userId // Sebaiknya updatedBy, tapi tabel join biasanya immutable, jadi recreate ok
+              createdBy: userId
             });
             await manager.save(prodCat);
           }
@@ -166,17 +204,14 @@ export class ProductService {
 
       // 2. Sinkronisasi Satuan (Units)
       const unitMap = new Map<any, string>();
-
       const existingUnits = await manager.find(ProductUnitEntity, { where: { productUuid: uuid } });
       const payloadUnitIds = units.filter(u => u.uuid).map(u => u.uuid);
 
-      // A. Delete Units
+      // A. Delete Units (Clean up prices and shelves)
       const unitsToDelete = existingUnits.filter(u => !payloadUnitIds.includes(u.uuid));
       if (unitsToDelete.length > 0) {
         const idsToDelete = unitsToDelete.map(u => u.uuid);
-        // Hapus dependensi anak dulu
         await manager.delete(ProductPriceEntity, { unitUuid: In(idsToDelete) });
-        await manager.delete(ProductStockEntity, { unitUuid: In(idsToDelete) });
         await manager.delete(ProductShelvePivotEntity, { unitUuid: In(idsToDelete) });
         await manager.delete(ProductUnitEntity, { uuid: In(idsToDelete) });
       }
@@ -184,32 +219,20 @@ export class ProductService {
       // B. Upsert Units
       for (const u of units) {
         let unitUuid = u.uuid;
-
         if (unitUuid) {
-          // Update Existing
           await manager.update(ProductUnitEntity, { uuid: unitUuid }, {
-            unitName: u.name,
-            unitMultiplier: u.multiplier,
-            barcode: u.barcode,
-            updatedBy: userId
+            unitName: u.name, unitMultiplier: u.multiplier, barcode: u.barcode, updatedBy: userId
           });
         } else {
-          // Create New Unit
           const newUnit = manager.create(ProductUnitEntity, {
-            productUuid: uuid,
-            unitName: u.name,
-            unitMultiplier: u.multiplier,
-            barcode: u.barcode,
-            createdBy: userId
+            productUuid: uuid, unitName: u.name, unitMultiplier: u.multiplier, barcode: u.barcode, createdBy: userId
           });
           const saved = await manager.save(newUnit);
           unitUuid = saved.uuid;
         }
 
-        // Mapping untuk harga & rak
         if (u.tempId) unitMap.set(u.tempId, unitUuid);
         if (u.uuid) unitMap.set(u.uuid, unitUuid);
-
         if (u.isDefault) product.defaultUnitUuid = unitUuid;
       }
 
@@ -217,33 +240,21 @@ export class ProductService {
       const existingPrices = await manager.find(ProductPriceEntity, { where: { productUuid: uuid } });
       const payloadPriceIds = prices.filter(p => p.uuid).map(p => p.uuid);
 
-      // A. Delete Prices
       const pricesToDelete = existingPrices.filter(p => !payloadPriceIds.includes(p.uuid));
       if (pricesToDelete.length > 0) {
         await manager.delete(ProductPriceEntity, { uuid: In(pricesToDelete.map(p => p.uuid)) });
       }
 
-      // B. Upsert Prices
       for (const p of prices) {
-        const targetUnitUuid = unitMap.get(p.unitTempId) || unitMap.get(p.unitUuid); // Handle tempId atau uuid lama
-
+        const targetUnitUuid = unitMap.get(p.unitTempId) || unitMap.get(p.unitUuid);
         if (targetUnitUuid) {
           if (p.uuid) {
             await manager.update(ProductPriceEntity, { uuid: p.uuid }, {
-              name: p.name,
-              price: p.price,
-              minWholesaleQty: p.minWholesaleQty || 0,
-              unitUuid: targetUnitUuid,
-              updatedBy: userId
+              name: p.name, price: p.price, minWholesaleQty: p.minWholesaleQty || 0, unitUuid: targetUnitUuid, updatedBy: userId
             });
           } else {
             const newPrice = manager.create(ProductPriceEntity, {
-              productUuid: uuid,
-              unitUuid: targetUnitUuid,
-              name: p.name,
-              price: p.price,
-              minWholesaleQty: p.minWholesaleQty || 0,
-              createdBy: userId
+              productUuid: uuid, unitUuid: targetUnitUuid, name: p.name, price: p.price, minWholesaleQty: p.minWholesaleQty || 0, createdBy: userId
             });
             await manager.save(newPrice);
             if (p.isDefault) product.defaultPriceUuid = newPrice.uuid;
@@ -251,33 +262,29 @@ export class ProductService {
         }
       }
 
-      // [PERBAIKAN ERROR] 4. Sinkronisasi Rak (Shelves Allocation)
-      // Kita update konfigurasi penempatan rak. 
-      // (Catatan: Stok Qty biasanya tidak diupdate disini, tapi alokasi rak iya)
+      // 4. [BARU] Catat Penyesuaian Stok ke Journal
+      if (stockAdjustments && Array.isArray(stockAdjustments) && stockAdjustments.length > 0) {
+        const mappedAdjustments = stockAdjustments.map(adj => {
+          const realUnitUuid = unitMap.get(adj.unitUuid) || adj.unitUuid;
+          return {
+            ...adj,
+            productUuid: uuid,
+            unitUuid: realUnitUuid,
+          }
+        });
+        await this.journalService.processStockAdjustment(mappedAdjustments, userId, manager);
+      }
+
+      // 5. Sinkronisasi Rak (Shelves Allocation)
       if (stocks && stocks.length > 0) {
         for (const s of stocks) {
-          // Cari Unit UUID yang valid (bisa jadi unit baru dibuat di loop atas)
-          // Frontend kirim unitTempId (untuk baru) atau unitUuid (untuk lama, biasanya kita map juga)
-          // Asumsi frontend konsisten mengirim key pengenal unit di `unitTempId` meskipun itu uuid lama
-          const realUnitUuid = unitMap.get(s.unitTempId);
-
+          const realUnitUuid = unitMap.get(s.unitTempId) || unitMap.get(s.unitUuid);
           if (realUnitUuid && s.allocations) {
-            // Strategi: Hapus semua alokasi rak lama untuk unit ini, lalu insert baru.
-            // Ini paling aman untuk menghindari kerumitan diffing.
-            await manager.delete(ProductShelvePivotEntity, {
-              productUuid: uuid,
-              unitUuid: realUnitUuid
-            });
-
-            // Insert alokasi baru
+            await manager.delete(ProductShelvePivotEntity, { productUuid: uuid, unitUuid: realUnitUuid });
             for (const alloc of s.allocations) {
               if (alloc.shelfUuid && alloc.qty > 0) {
                 const newShelfAlloc = manager.create(ProductShelvePivotEntity, {
-                  productUuid: uuid,
-                  unitUuid: realUnitUuid,
-                  shelveUuid: alloc.shelfUuid,
-                  qty: alloc.qty,
-                  createdBy: userId // atau updatedBy logic
+                  productUuid: uuid, unitUuid: realUnitUuid, shelveUuid: alloc.shelfUuid, qty: alloc.qty, createdBy: userId
                 });
                 await manager.save(newShelfAlloc);
               }
@@ -287,30 +294,71 @@ export class ProductService {
       }
 
       await manager.save(product);
-
       return await this.findOne(uuid, storeUuid);
     });
   }
 
+  // ==========================================================
+  // FIND ALL (Inject Stock Calculation)
+  // ==========================================================
   async findAll(storeUuid?: string) {
-    return await this.productRepo.find({
+    const products = await this.productRepo.find({
       where: { storeUuid: storeUuid },
       order: { createdAt: 'DESC' },
-      relations: ['units', 'stock', 'price', 'shelve', 'shelve.shelve', 'productCategory', 'productCategory.category'],
+      relations: ['units', 'price', 'shelve', 'shelve.shelve', 'productCategory', 'productCategory.category'],
+    });
+
+    if (products.length === 0) return products;
+
+    const allUnits: ProductUnitEntity[] = [];
+    products.forEach(p => {
+      if (p.units) allUnits.push(...p.units);
+    });
+
+    if (allUnits.length === 0) return products;
+
+    const manager = this.dataSource.manager;
+    const stockMap = await this.calculateStockForUnits(allUnits, manager);
+
+    return products.map(product => {
+      product.units = product.units.map(unit => ({
+        ...unit,
+        // Attach the calculated stock as 'currentStock' property (non-entity property)
+        currentStock: stockMap.get(unit.uuid) || 0
+      } as ProductUnitEntity & { currentStock: number; }));
+
+      return product;
     });
   }
 
+  // ==========================================================
+  // FIND ONE (Inject Stock Calculation)
+  // ==========================================================
   async findOne(uuid: string, storeUuid?: string) {
-    return await this.productRepo.findOne({
+    const product = await this.productRepo.findOne({
       where: {
         uuid: uuid,
         storeUuid: storeUuid
       },
-      relations: ['units', 'stock', 'price', 'shelve', 'shelve.shelve', 'productCategory', 'productCategory.category'],
+      relations: ['units', 'price', 'shelve', 'shelve.shelve', 'productCategory', 'productCategory.category'],
     });
+
+    if (product && product.units && product.units.length > 0) {
+      const manager = this.dataSource.manager;
+      const stockMap = await this.calculateStockForUnits(product.units, manager);
+
+      product.units = product.units.map(unit => ({
+        ...unit,
+        currentStock: stockMap.get(unit.uuid) || 0
+      } as ProductUnitEntity & { currentStock: number; })); // Tambahkan currentStock
+    }
+
+    return product;
   }
 
-  // ... method helper lainnya
+  // ==========================================================
+  // DELETION & UNIT MANAGEMENT
+  // ==========================================================
   async softDelete(uuid: string, userId: string, storeUuid?: string) {
     const data = await this.findOne(uuid, storeUuid);
     if (!data) return null;
@@ -335,8 +383,6 @@ export class ProductService {
     }
 
     await this.priceRepo.delete({ unitUuid: unitUuid });
-    await this.stokRepo.delete({ unitUuid: unitUuid });
-    // Hapus data rak terkait unit ini
     await this.dataSource.getRepository(ProductShelvePivotEntity).delete({ unitUuid: unitUuid });
 
     return await this.unitRepo.remove(unit);
@@ -358,7 +404,7 @@ export class ProductService {
       productUuid,
       unitName,
       unitMultiplier,
-      barcode, // <--- Simpan
+      barcode,
       createdBy: userId
     });
     const savedUnit = await this.unitRepo.save(newUnit);
@@ -390,81 +436,5 @@ export class ProductService {
       await this.productRepo.save(product);
     }
     return savedPrice;
-  }
-
-  async addStock(productUuid: string, qty: number, userId?: string) {
-    const stok = this.stokRepo.create({ productUuid, qty, createdBy: userId });
-    return await this.stokRepo.save(stok);
-  }
-
-  async reduceStock(
-    productUuid: string,
-    qty: number,
-    userId: string,
-    storeUuid?: string
-  ) {
-    const product = await this.findOne(productUuid, storeUuid);
-    if (!product) throw new BadRequestException('Product not found');
-
-    // Hitung total stok global produk
-    const total = product.stock.reduce((sum, s) => sum + s.qty, 0);
-    if (total < qty) throw new BadRequestException('Stok tidak mencukupi');
-
-    const stok = this.stokRepo.create({ productUuid, qty: -Math.abs(qty), createdBy: userId });
-    return await this.stokRepo.save(stok);
-  }
-
-  async processSaleStock(
-    details: Record<string, any>,
-    userId: string | undefined,
-    manager: EntityManager,
-  ) {
-    const itemsMap = new Map<string, any>();
-
-    Object.keys(details).forEach((key) => {
-      // Kita gunakan delimiter '_' sesuai frontend (productUuid_0)
-      if (key.includes('_')) {
-        const parts = key.split('_');
-
-        // Ambil bagian terakhir sebagai index (string | undefined)
-        const index = parts.pop();
-
-        // Ambil sisa bagian depan sebagai nama field
-        const fieldName = parts.join('_');
-
-        // --- [PERBAIKAN DI SINI] ---
-        // Cek: Jika index tidak ada (undefined), hentikan proses untuk key ini
-        if (!index) return;
-
-        // Sekarang TypeScript tahu 'index' pasti string
-        if (!itemsMap.has(index)) {
-          itemsMap.set(index, {});
-        }
-
-        const itemObj = itemsMap.get(index);
-
-        // Pastikan itemObj ada sebelum diisi
-        if (itemObj) {
-          if (fieldName === 'productUuid') itemObj.productUuid = details[key];
-          if (fieldName === 'unitUuid') itemObj.unitUuid = details[key];
-          if (fieldName === 'qty') itemObj.qty = Number(details[key]);
-        }
-      }
-    });
-
-    // 2. Simpan Stok Negatif (Barang Keluar)
-    for (const [_, item] of itemsMap) {
-      // Pastikan productUuid ada dan qty valid
-      if (item.productUuid && item.qty > 0) {
-        const stockEntry = manager.create(ProductStockEntity, {
-          productUuid: item.productUuid,
-          unitUuid: item.unitUuid || null,
-          qty: -Math.abs(item.qty), // Negatif = Keluar
-          createdBy: userId,
-        });
-
-        await manager.save(stockEntry);
-      }
-    }
   }
 }

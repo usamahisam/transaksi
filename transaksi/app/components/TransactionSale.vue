@@ -1,12 +1,14 @@
+// components/TransactionSale.vue
+
 <script setup>
-import { ref, computed, onMounted, reactive, watch } from 'vue'; // Tambah watch
+import { ref, computed, onMounted, reactive, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import ProductCreateModal from '~/components/ProductCreateModal.vue';
 import { useAuthStore } from '~/stores/auth.store';
 
 const productService = useProductService();
 const journalService = useJournalService();
-const categoryService = useCategoryService(); // [BARU] Inject Service Kategori
+const categoryService = useCategoryService();
 const authStore = useAuthStore();
 const toast = useToast();
 
@@ -19,20 +21,19 @@ const loading = ref(true);
 const processing = ref(false);
 const showCreateModal = ref(false);
 
-// [BARU] State Kategori
 const categories = ref([]); 
-const selectedCategoryUuids = ref([]); // Model untuk MultiSelect
+const selectedCategoryUuids = ref([]); 
 
 const payment = reactive({
     amount: null,
 });
 
-// --- COMPUTED SETTINGS ... (Tetap sama)
+// --- COMPUTED SETTINGS ---
 const taxEnabled = computed(() => authStore.getSetting('sale_tax_enabled', false));
 const taxRate = computed(() => Number(authStore.getSetting('sale_tax_percentage', 0)));
 const taxMethod = computed(() => authStore.getSetting('sale_tax_method', 'exclusive'));
 
-// --- COMPUTED TRANSACTION LOGIC ... (Tetap sama)
+// --- COMPUTED TRANSACTION LOGIC ---
 const totalItems = computed(() => cart.value.reduce((a, b) => a + b.qty, 0));
 const cartSubtotal = computed(() => cart.value.reduce((total, item) => total + (item.price * item.qty), 0));
 const taxAmount = computed(() => {
@@ -54,7 +55,6 @@ const onSearchKeydown = (event) => {
     if (event.key === 'Enter') handleSearch();
 };
 
-// [BARU] Fetch Categories
 const fetchCategories = async () => {
     try {
         const data = await categoryService.getAllCategorys();
@@ -62,7 +62,6 @@ const fetchCategories = async () => {
     } catch (e) { console.error(e); }
 };
 
-// [UPDATED] Load Products dengan Mapping Kategori
 const loadProducts = async () => {
     loading.value = true;
     try {
@@ -70,12 +69,10 @@ const loadProducts = async () => {
         products.value = (data || []).map(p => ({
             ...p,
             prices: p.prices || p.price || [],
-            stock: p.stock || [],
             units: p.units || [],
-            // [PENTING] Simpan UUID Kategori produk ini dalam array datar untuk filtering
             categoryUuids: (p.productCategory || []).map(pc => pc.category?.uuid).filter(Boolean)
         }));
-        handleSearch(); // Panggil filter awal
+        handleSearch();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat produk', life: 3000 });
     } finally {
@@ -83,38 +80,28 @@ const loadProducts = async () => {
     }
 };
 
-// [UPDATED] Handle Search & Filter (Text + Category)
 const handleSearch = () => {
     const query = searchQuery.value.toLowerCase().trim();
     const selectedCats = selectedCategoryUuids.value;
 
-    // 1. Filter Awal (Semua Data)
     let result = products.value;
 
-    // 2. Filter Kategori (Jika ada yang dipilih)
     if (selectedCats.length > 0) {
         result = result.filter(p => {
-            // Cek apakah produk ini memiliki SALAH SATU dari kategori yang dipilih
             return p.categoryUuids.some(catUuid => selectedCats.includes(catUuid));
         });
     }
 
-    // 3. Filter Text (Barcode / Nama)
     if (query) {
-        // Cek Barcode Exact Match (Prioritas)
         const exactProduct = result.find(p => p.units.some(u => u.barcode === query));
         if (exactProduct) {
-            // Jika scan barcode ketemu, langsung masukkan cart dan reset search
             const matchedUnit = exactProduct.units.find(u => u.barcode === query);
             addToCart(exactProduct, matchedUnit);
             searchQuery.value = ''; 
             toast.add({ severity: 'success', summary: 'Scan', detail: `${exactProduct.name}`, life: 1500 });
-            // Reset list ke hasil filter kategori (tanpa query text karena sudah di-reset)
-            // Recurse call handleSearch() with empty query
             return handleSearch(); 
         }
 
-        // Fuzzy Search Nama / Barcode Parsial
         result = result.filter(p => 
             p.name.toLowerCase().includes(query) || 
             p.units.some(u => u.barcode?.includes(query))
@@ -124,12 +111,10 @@ const handleSearch = () => {
     filteredProducts.value = result;
 };
 
-// [BARU] Watcher untuk filter otomatis saat kategori berubah
 watch(selectedCategoryUuids, () => {
     handleSearch();
 });
 
-// ... (Sisa function addToCart, changeCartItemUnit, dll TETAP SAMA) ...
 const addToCart = (product, specificUnit = null) => {
     let selectedUnit = specificUnit;
     if (!selectedUnit) {
@@ -232,6 +217,16 @@ const processCheckout = async () => {
 
 const formatCurrency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 
+const getDefaultUnitStock = (prod) => {
+    const defaultUnit = prod.units.find(u => u.uuid === prod.defaultUnitUuid) || prod.units[0];
+    return defaultUnit?.currentStock || 0; 
+};
+
+const getDefaultUnitName = (prod) => {
+    const defaultUnit = prod.units.find(u => u.uuid === prod.defaultUnitUuid) || prod.units[0];
+    return defaultUnit?.unitName;
+};
+
 const getStockColor = (qty) => {
     if (qty <= 0) return 'bg-red-100 text-red-600 border-red-200';
     if (qty < 10) return 'bg-amber-100 text-amber-600 border-amber-200';
@@ -239,22 +234,23 @@ const getStockColor = (qty) => {
 };
 
 onMounted(async () => {
-    if (!authStore.activeStore) await authStore.fetchUserStores();
-    await fetchCategories(); // Load kategori dulu
+    await fetchCategories(); 
     await loadProducts();
     
     window.addEventListener('keydown', (e) => {
-        if (e.key === 'F2') document.getElementById('search-input')?.focus();
+        if (e.key === 'F2') document.getElementById('search-input-sale')?.focus();
     });
 });
 
-definePageMeta({ layout: 'default' });
+// [BARU] Expose fungsi refresh agar bisa dipanggil dari parent (TransactionIndex.vue)
+const refreshData = async () => {
+    await loadProducts();
+}
+defineExpose({ refreshData });
 </script>
 
 <template>
-    <div class="flex flex-col lg:flex-row h-[calc(100vh-5rem)] gap-4 p-4 overflow-hidden bg-surface-50 dark:bg-surface-950 font-sans">
-        <Toast />
-
+    <div class="flex flex-col lg:flex-row h-full gap-4 p-4 overflow-hidden bg-surface-50 dark:bg-surface-950 font-sans">
         <div class="flex-1 flex flex-col bg-white dark:bg-surface-900 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden">
             <div class="p-3 border-b border-surface-100 dark:border-surface-800 flex flex-col md:flex-row gap-2 bg-surface-50/50">
                 
@@ -282,7 +278,7 @@ definePageMeta({ layout: 'default' });
                 <div class="relative flex-1">
                     <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
                     <input 
-                        id="search-input"
+                        id="search-input-sale"
                         v-model="searchQuery" 
                         type="text"
                         placeholder="Cari Produk / Scan Barcode... (F2)" 
@@ -292,7 +288,7 @@ definePageMeta({ layout: 'default' });
                         autocomplete="off"
                     />
                 </div>
-                <Button icon="pi pi-plus" class="!w-10 !h-10 !rounded-lg" severity="primary" outlined v-tooltip.bottom="'Produk Baru'" @click="showCreateModal = true" />
+                <Button icon="pi pi-plus" class="!w-10 !h-10 !rounded-lg" severity="primary" outlined v-tooltip.bottom="'Produk Baru'" @click="$emit('open-create-modal')" />
             </div>
 
             <div class="flex-1 overflow-y-auto p-3 bg-surface-50 dark:bg-surface-950 scrollbar-thin">
@@ -310,18 +306,18 @@ definePageMeta({ layout: 'default' });
                                 {{ prod.name }}
                             </div>
                             <div class="flex gap-1 mt-1">
-                                <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded border" :class="getStockColor(prod.stock?.reduce((a,b)=>a+b.qty,0)||0)">
-                                    Stok: {{ prod.stock?.reduce((a,b)=>a+b.qty,0) || 0 }}
+                                <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded border" :class="getStockColor(getDefaultUnitStock(prod))">
+                                    Stok: {{ getDefaultUnitStock(prod) }}
                                 </span>
                                 <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-surface-100 text-surface-500 border border-surface-200">
-                                    {{ (prod.units.find(u => u.uuid === prod.defaultUnitUuid) || prod.units[0])?.unitName }}
+                                    {{ getDefaultUnitName(prod) }}
                                 </span>
                             </div>
                         </div>
                         
                         <div class="flex justify-between items-end mt-2">
                             <span class="text-[9px] text-surface-400 truncate max-w-[50%]">
-                                {{ prod.categoryUuids.length > 0 ? (categories.find(c => c.uuid === prod.categoryUuids[0])?.name || 'Kategori') : 'Umum' }}
+                                {{ categories.find(c => c.uuid === prod.categoryUuids[0])?.name || 'Umum' }}
                             </span>
                             <span class="text-sm font-black text-surface-800 dark:text-white">
                                 {{ (() => {

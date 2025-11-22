@@ -27,12 +27,11 @@ const items = ref([
         ]
     },
     { 
-        label: 'Transaksi', 
-        icon: 'pi pi-wallet',
+        label: 'Menu', 
+        icon: 'pi pi-list',
         key: 'transaksi',
         items: [
-            { label: 'Penjualan', icon: 'pi pi-shopping-cart', route: '/transaction/sale' },
-            { label: 'Pembelian', icon: 'pi pi-truck', route: '/transaction/buy' },
+            { label: 'Transaksi', icon: 'pi pi-wallet', route: '/transaction' },
         ]
     },
     { 
@@ -40,9 +39,7 @@ const items = ref([
         icon: 'pi pi-chart-bar',
         key: 'laporan',
         items: [
-            { label: 'Penjualan', icon: 'pi pi-file-pdf', route: '/report/sale' },
-            { label: 'Pembelian', icon: 'pi pi-shopping-bag', route: '/report/buy' },
-            { label: 'Analisis', icon: 'pi pi-chart-line', route: '/report/graph' },
+            { label: 'Transaksi', icon: 'pi pi-chart-line', route: '/report' },
         ]
     }
 ]);

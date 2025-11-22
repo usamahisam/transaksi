@@ -9,7 +9,6 @@ import {
   JoinColumn,
   ManyToOne,
 } from 'typeorm';
-import { ProductStockEntity } from '../product_stock/product_stock.entity';
 import { ProductUnitEntity } from '../product_unit/product_unit.entity';
 import { ProductPriceEntity } from '../product_price/product_price.entity';
 import { ProductShelvePivotEntity } from '../product_shelve_pivot/product_shelve_pivot.entity';
@@ -70,9 +69,6 @@ export class ProductEntity {
 
   @OneToMany(() => ProductUnitEntity, (unit) => unit.product)
   units: ProductUnitEntity[];
-
-  @OneToMany(() => ProductStockEntity, (stock) => stock.product)
-  stock: ProductStockEntity[];
 
   @OneToMany(() => ProductPriceEntity, (price) => price.product)
   price: ProductPriceEntity[];

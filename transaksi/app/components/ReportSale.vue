@@ -1,8 +1,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-// Sesuaikan import service dengan struktur project Anda
-const journalService = useJournalService();
+import { useToast } from 'primevue/usetoast';
+
 const productService = useProductService();
+const journalService = useJournalService();
+const toast = useToast();
 
 const transactions = ref([]);
 const productsMap = ref({});
@@ -12,13 +14,12 @@ const filters = ref({
     global: { value: null, matchMode: 'contains' }
 });
 
-// --- COMPUTED STATS (Dashboard Mini) ---
+// --- COMPUTED STATS ---
 const stats = computed(() => {
     const totalOmset = transactions.value.reduce((sum, t) => sum + t.total, 0);
     const totalTrx = transactions.value.length;
     const average = totalTrx > 0 ? totalOmset / totalTrx : 0;
     
-    // Hitung total items terjual
     const totalItems = transactions.value.reduce((sum, t) => {
         return sum + t.items.reduce((s, i) => s + i.qty, 0);
     }, 0);
@@ -30,17 +31,14 @@ const stats = computed(() => {
 const loadData = async () => {
     loading.value = true;
     try {
-        // 1. Load Master Produk (Untuk lookup nama produk dari UUID)
         const productsData = await productService.getAllProducts();
         productsMap.value = (productsData || []).reduce((acc, curr) => {
             acc[curr.uuid] = curr.name;
             return acc;
         }, {});
 
-        // 2. Load Laporan Penjualan
         const rawData = await journalService.getSalesReport();
         
-        // 3. Parsing Data
         transactions.value = rawData.map(journal => {
             const detailsMap = Array.isArray(journal.details) 
                 ? journal.details.reduce((acc, curr) => { acc[curr.key] = curr.value; return acc; }, {}) 
@@ -48,7 +46,6 @@ const loadData = async () => {
 
             const count = Number(detailsMap['total_items_count'] || 0);
             
-            // Reconstruct Items
             const items = [];
             for (let i = 0; i < count; i++) {
                 const pUuid = detailsMap[`product_uuid#${i}`];
@@ -65,13 +62,14 @@ const loadData = async () => {
                 code: journal.code || journal.transactionNo || 'TRX-' + journal.uuid.substr(0,8).toUpperCase(),
                 date: journal.createdAt,
                 total: Number(detailsMap['grand_total'] || 0),
-                method: detailsMap['payment_method'] || 'CASH', // Default CASH
+                method: detailsMap['payment_method'] || 'CASH', 
                 items: items 
             };
         });
 
     } catch (e) {
         console.error("Gagal memuat data", e);
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat data penjualan', life: 3000 });
     } finally {
         loading.value = false;
     }
@@ -101,26 +99,16 @@ onMounted(() => {
     loadData();
 });
 
-definePageMeta({ layout: 'default' });
+const refreshData = async () => {
+    await loadData();
+}
+
+defineExpose({ refreshData });
 </script>
 
 <template>
-    <div class="min-h-screen bg-surface-50 dark:bg-surface-950 p-4 md:p-6 animate-fade-in font-sans">
+    <div class="h-full flex flex-col bg-surface-50 dark:bg-surface-950">
         
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <div>
-                <h1 class="text-3xl font-black text-surface-900 dark:text-surface-0 tracking-tight mb-1">
-                    Laporan Penjualan
-                </h1>
-                <p class="text-surface-500 dark:text-surface-400">
-                    Rekapitulasi omset harian dan detail transaksi kasir.
-                </p>
-            </div>
-            <div class="flex gap-2">
-                <Button icon="pi pi-refresh" label="Refresh" severity="secondary" outlined class="!rounded-lg" @click="loadData" :loading="loading" />
-            </div>
-        </div>
-
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             <div class="bg-white dark:bg-surface-900 p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
@@ -159,7 +147,7 @@ definePageMeta({ layout: 'default' });
             </div>
         </div>
 
-        <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden">
+        <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden flex-1">
             
             <div class="p-4 border-b border-surface-200 dark:border-surface-800 flex flex-col sm:flex-row justify-between gap-4 items-center bg-surface-50/50 dark:bg-surface-900">
                 <div class="w-full sm:w-auto">
@@ -270,13 +258,3 @@ definePageMeta({ layout: 'default' });
         </div>
     </div>
 </template>
-
-<style scoped>
-.animate-fade-in {
-    animation: fadeIn 0.4s ease-in-out;
-}
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-</style>

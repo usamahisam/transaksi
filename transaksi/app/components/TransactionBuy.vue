@@ -1,11 +1,13 @@
+// components/TransactionBuy.vue
+
 <script setup>
-import { ref, computed, onMounted, reactive, watch } from 'vue'; // Tambah watch
+import { ref, computed, onMounted, reactive, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import ProductCreateModal from '~/components/ProductCreateModal.vue';
 
 const productService = useProductService();
 const journalService = useJournalService();
-const categoryService = useCategoryService(); // [BARU] Inject Service Kategori
+const categoryService = useCategoryService(); 
 const toast = useToast();
 
 // --- STATE ---
@@ -15,11 +17,9 @@ const cart = ref([]);
 const searchQuery = ref('');
 const loading = ref(true);
 const processing = ref(false);
-const showCreateModal = ref(false);
 
-// [BARU] State Kategori
 const categories = ref([]); 
-const selectedCategoryUuids = ref([]); // Model untuk MultiSelect
+const selectedCategoryUuids = ref([]); 
 
 // State khusus Pembelian
 const purchaseInfo = reactive({
@@ -48,7 +48,6 @@ const onSearchKeydown = (event) => {
     if (event.key === 'Enter') handleSearch();
 };
 
-// [BARU] Fetch Categories
 const fetchCategories = async () => {
     try {
         const data = await categoryService.getAllCategorys();
@@ -64,12 +63,10 @@ const loadProducts = async () => {
         products.value = (data || []).map(p => ({
             ...p,
             prices: p.prices || p.price || [],
-            stock: p.stock || [],
             units: p.units || [],
-            // [PENTING] Simpan UUID Kategori untuk filtering
             categoryUuids: (p.productCategory || []).map(pc => pc.category?.uuid).filter(Boolean)
         }));
-        handleSearch(); // Filter awal
+        handleSearch(); 
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat produk', life: 3000 });
     } finally {
@@ -77,34 +74,28 @@ const loadProducts = async () => {
     }
 };
 
-// [UPDATED] Handle Search & Filter (Text + Category)
 const handleSearch = () => {
     const query = searchQuery.value.toLowerCase().trim();
     const selectedCats = selectedCategoryUuids.value;
 
-    // 1. Filter Awal (Semua Data)
     let result = products.value;
 
-    // 2. Filter Kategori (Jika ada yang dipilih)
     if (selectedCats.length > 0) {
         result = result.filter(p => {
             return p.categoryUuids.some(catUuid => selectedCats.includes(catUuid));
         });
     }
 
-    // 3. Filter Text (Barcode / Nama)
     if (query) {
-        // Cek Barcode Exact Match
         const exactProduct = result.find(p => p.units.some(u => u.barcode === query));
         if (exactProduct) {
             const matchedUnit = exactProduct.units.find(u => u.barcode === query);
             addToCart(exactProduct, matchedUnit);
             searchQuery.value = ''; 
             toast.add({ severity: 'success', summary: 'Scan', detail: `${exactProduct.name} ditambahkan`, life: 1500 });
-            return handleSearch(); // Reset list
+            return handleSearch(); 
         }
 
-        // Fuzzy Search
         result = result.filter(p => 
             p.name.toLowerCase().includes(query) || 
             p.units.some(u => u.barcode?.includes(query))
@@ -114,12 +105,22 @@ const handleSearch = () => {
     filteredProducts.value = result;
 };
 
-// [BARU] Watcher Filter Kategori
 watch(selectedCategoryUuids, () => {
     handleSearch();
 });
 
-// ... (Sisa fungsi addToCart, changeCartItemUnit, removeFromCart, onProductCreated, processPurchase, dll TETAP SAMA)
+// [BARU] Helper untuk mendapatkan Stok Unit Default
+const getDefaultUnitStock = (prod) => {
+    const defaultUnit = prod.units.find(u => u.uuid === prod.defaultUnitUuid) || prod.units[0];
+    return defaultUnit?.currentStock || 0; 
+};
+
+// [BARU] Helper untuk mendapatkan Nama Unit Default
+const getDefaultUnitName = (prod) => {
+    const defaultUnit = prod.units.find(u => u.uuid === prod.defaultUnitUuid) || prod.units[0];
+    return defaultUnit?.unitName;
+};
+
 const addToCart = (product, specificUnit = null) => {
     let selectedUnit = specificUnit;
     if (!selectedUnit) {
@@ -147,7 +148,7 @@ const addToCart = (product, specificUnit = null) => {
         });
         
         setTimeout(() => {
-            const cartEl = document.getElementById('cart-items-container');
+            const cartEl = document.getElementById('cart-items-container-buy');
             if(cartEl) cartEl.scrollTop = cartEl.scrollHeight;
         }, 50);
     }
@@ -224,20 +225,22 @@ const getStockColor = (qty) => {
 };
 
 onMounted(async () => {
-    await fetchCategories(); // Load kategori
+    await fetchCategories(); 
     await loadProducts();
     window.addEventListener('keydown', (e) => {
-        if (e.key === 'F2') document.getElementById('search-input')?.focus();
+        if (e.key === 'F2') document.getElementById('search-input-buy')?.focus();
     });
 });
 
-definePageMeta({ layout: 'default' });
+// [BARU] Expose fungsi refresh agar bisa dipanggil dari parent (TransactionIndex.vue)
+const refreshData = async () => {
+    await loadProducts();
+}
+defineExpose({ refreshData });
 </script>
 
 <template>
-    <div class="flex flex-col lg:flex-row h-[calc(100vh-5rem)] gap-4 p-4 overflow-hidden bg-surface-50 dark:bg-surface-950 font-sans">
-        <Toast />
-
+    <div class="flex flex-col lg:flex-row h-full gap-4 p-4 overflow-hidden bg-surface-50 dark:bg-surface-950 font-sans">
         <div class="flex-1 flex flex-col bg-white dark:bg-surface-900 rounded-2xl shadow border border-surface-200 dark:border-surface-800 h-full overflow-hidden">
             <div class="p-4 border-b border-surface-100 dark:border-surface-800 flex flex-col gap-3 bg-surface-50/30">
                 <div class="flex justify-between items-center">
@@ -250,7 +253,7 @@ definePageMeta({ layout: 'default' });
                             <span class="text-[10px] text-surface-500 mt-1 font-medium">Pilih produk untuk restock</span>
                         </div>
                     </div>
-                    <Button label="Produk Baru" icon="pi pi-plus" size="small" outlined severity="warning" class="!text-[11px] !py-1.5 !px-3 !rounded-lg" @click="showCreateModal = true" />
+                    <Button label="Produk Baru" icon="pi pi-plus" size="small" outlined severity="warning" class="!text-[11px] !py-1.5 !px-3 !rounded-lg" @click="$emit('open-create-modal')" />
                 </div>
                 
                 <div class="flex flex-col md:flex-row gap-2">
@@ -278,7 +281,7 @@ definePageMeta({ layout: 'default' });
                     <div class="relative group flex-1">
                         <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-sm group-focus-within:text-orange-500 transition-colors"></i>
                         <input 
-                            id="search-input"
+                            id="search-input-buy"
                             v-model="searchQuery" 
                             type="text"
                             placeholder="Cari nama produk atau scan barcode... (F2)" 
@@ -318,15 +321,15 @@ definePageMeta({ layout: 'default' });
                                 <div class="flex flex-col gap-1 w-full">
                                     <div class="flex items-center justify-between">
                                         <span class="text-[9px] text-surface-400 truncate max-w-[70%]">
-                                            {{ prod.categoryUuids.length > 0 ? (categories.find(c => c.uuid === prod.categoryUuids[0])?.name || 'Kategori') : 'Umum' }}
+                                            {{ categories.find(c => c.uuid === prod.categoryUuids[0])?.name || 'Umum' }}
                                         </span>
                                     </div>
 
                                     <div class="flex items-center gap-1">
                                         <span class="text-[10px] text-surface-400 font-medium mr-1">Sisa:</span>
                                         <span class="text-[10px] font-bold px-1.5 py-0.5 rounded border w-fit" 
-                                              :class="getStockColor(prod.stock?.reduce((a,b)=>a+b.qty,0)||0)">
-                                            {{ prod.stock?.reduce((a,b)=>a+b.qty,0) || 0 }} {{ (prod.units.find(u => u.uuid === prod.defaultUnitUuid) || prod.units[0])?.unitName }}
+                                              :class="getStockColor(getDefaultUnitStock(prod))">
+                                            {{ getDefaultUnitStock(prod) }} {{ getDefaultUnitName(prod) }}
                                         </span>
                                     </div>
                                 </div>
@@ -347,7 +350,7 @@ definePageMeta({ layout: 'default' });
         <div class="w-[380px] flex flex-col bg-white dark:bg-surface-900 rounded-2xl shadow border border-surface-200 dark:border-surface-800 overflow-hidden shrink-0">
             <div class="p-3 px-4 border-b border-surface-100 dark:border-surface-800 flex justify-between items-center bg-surface-50/50">
                 <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center">
+                    <div class="w-7 h-7 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
                         <span class="font-bold text-xs">{{ totalItems }}</span>
                     </div>
                     <span class="font-bold text-sm text-surface-700">Item Masuk</span>
@@ -365,7 +368,7 @@ definePageMeta({ layout: 'default' });
                 />
             </div>
 
-            <div id="cart-items-container" class="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-thin bg-surface-50/30">
+            <div id="cart-items-container-buy" class="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-thin bg-surface-50/30">
                 <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-surface-300 gap-2 opacity-60">
                     <i class="pi pi-inbox text-4xl mb-1"></i>
                     <p class="text-xs font-medium">Belum ada barang dipilih</p>
@@ -510,20 +513,5 @@ definePageMeta({ layout: 'default' });
     display: flex;
     align-items: center;
     white-space: nowrap;
-}
-:deep(.custom-pill-dropdown .p-dropdown-trigger) {
-    width: 16px !important;
-    padding: 0 !important;
-}
-
-/* Remove Input Number Arrows/Spinner */
-:deep(.p-inputnumber-input) {
-    appearance: none;
-    -moz-appearance: textfield;
-}
-:deep(.p-inputnumber-input)::-webkit-inner-spin-button, 
-:deep(.p-inputnumber-input)::-webkit-outer-spin-button { 
-    -webkit-appearance: none;
-    margin: 0; 
 }
 </style>

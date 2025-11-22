@@ -18,12 +18,12 @@ const filters = ref({ global: { value: null, matchMode: 'contains' } });
 const fetchProducts = async () => {
     loading.value = true;
     try {
-        // Asumsi relasi di backend: prices/price, productCategory, category
+        // Backend (ProductService.findAll) kini mengembalikan data units yang sudah diinjeksi 
+        // dengan properti virtual 'currentStock' (dihitung dari Journal)
         const data = await productService.getAllProducts();
         products.value = (data || []).map(p => ({
             ...p,
             prices: p.prices || p.price || [],
-            stock: p.stock || [],
             units: p.units || [],
             shelve: p.shelve || [],
             // Mapping Kategori dari relasi productCategory
@@ -57,7 +57,19 @@ const confirmDelete = (prod) => {
 // --- HELPERS ---
 const formatCurrency = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
 const getPricesForUnit = (all, uid) => all.filter(p => p.unitUuid === uid);
-const getStockForUnit = (all, uid) => all.find(s => s.unitUuid === uid)?.qty || 0;
+
+// [BARU] Helper untuk mendapatkan total stok unit (currentStock)
+const getCurrentStock = (unit) => {
+    // currentStock adalah properti virtual yang disuntikkan oleh ProductService di backend
+    return unit.currentStock || 0; 
+};
+
+// [BARU] Helper untuk menentukan warna Stok berdasarkan Qty (Memanfaatkan currentStock)
+const getStockColor = (qty) => {
+    if (qty <= 0) return 'bg-red-100 text-red-600 border-red-200';
+    if (qty < 10) return 'bg-amber-100 text-amber-600 border-amber-200';
+    return 'bg-blue-50 text-blue-600 border-blue-200';
+};
 
 const getUniqueShelves = (product) => {
     if (!product.shelve || !Array.isArray(product.shelve)) return [];
@@ -88,7 +100,7 @@ defineExpose({ refresh: fetchProducts });
         </div>
 
         <div class="card bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 shadow-sm overflow-hidden">
-            <DataTable :value="products" :loading="loading" paginator :rows="10" dataKey="uuid" :filters="filters" stripedRows tableStyle="min-width: 90rem" class="text-sm" :globalFilterFields="['name', 'units.barcode']">
+             <DataTable :value="products" :loading="loading" paginator :rows="10" dataKey="uuid" :filters="filters" stripedRows tableStyle="min-width: 90rem" class="text-sm" :globalFilterFields="['name', 'units.barcode']">
                 <template #empty>
                     <div class="flex flex-col items-center justify-center py-12 text-surface-400">
                         <i class="pi pi-inbox text-5xl mb-3 opacity-30"></i>
@@ -158,7 +170,9 @@ defineExpose({ refresh: fetchProducts });
                                     </div>
                                     <div class="flex items-center gap-1">
                                         <span class="text-[10px] text-surface-500 uppercase font-bold">Stok:</span>
-                                        <span class="text-sm font-black" :class="getStockForUnit(slotProps.data.stock, u.uuid) > 0 ? 'text-surface-800 dark:text-surface-200' : 'text-red-500'">{{ getStockForUnit(slotProps.data.stock, u.uuid) }}</span>
+                                        <span class="text-sm font-black" :class="getCurrentStock(u) > 0 ? 'text-surface-800 dark:text-surface-200' : 'text-red-500'">
+                                            {{ getCurrentStock(u) }}
+                                        </span>
                                     </div>
                                 </div>
                                 

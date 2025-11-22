@@ -10,7 +10,6 @@ import {
   OneToMany,
 } from 'typeorm';
 import { ProductEntity } from '../product/product.entity';
-import { ProductStockEntity } from '../product_stock/product_stock.entity';
 import { ProductPriceEntity } from '../product_price/product_price.entity';
 import { UserEntity } from '../user/user.entity';
 
@@ -19,10 +18,10 @@ export enum ProductUnitEnum {
   LUSIN = 'LUSIN',
   DUS = 'DUS',
   KARTON = 'KARTON',
-  BOX = 'BOX',    
-  KG = 'KG',         
-  LITER = 'LITER',   
-  PACK = 'PACK',     
+  BOX = 'BOX',
+  KG = 'KG',
+  LITER = 'LITER',
+  PACK = 'PACK',
 }
 
 @Entity('product_unit')
@@ -58,21 +57,21 @@ export class ProductUnitEntity {
 
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy?: string;
-            
+
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'created_by' })
   createdByUser?: UserEntity;
 
   @Column({ name: 'updated_by', type: 'uuid', nullable: true })
   updatedBy?: string;
-              
+
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'updated_by' })
   updatedByUser?: UserEntity;
 
   @Column({ name: 'deleted_by', type: 'uuid', nullable: true })
   deletedBy?: string;
-              
+
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'deleted_by' })
   deletedByUser?: UserEntity;
@@ -85,10 +84,7 @@ export class ProductUnitEntity {
 
   @Column({ name: 'product_uuid', type: 'uuid' })
   productUuid: string;
-  
-  @OneToMany(() => ProductStockEntity, (stock) => stock.unit)
-  stock?: ProductStockEntity[];
-  
+
   @OneToMany(() => ProductPriceEntity, (price) => price.unit)
   prices: ProductPriceEntity[];
 }

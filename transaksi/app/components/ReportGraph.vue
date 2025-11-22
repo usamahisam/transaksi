@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import dayjs from 'dayjs'; 
 
+// Anggap useJournalService sudah di-import di composable
 const journalService = useJournalService();
 
 // State
@@ -152,7 +153,7 @@ const setChartOptions = () => {
         scales: {
             x: {
                 ticks: { color: textColorSecondary },
-                grid: { display: false } // Hilangkan grid vertikal biar bersih
+                grid: { display: false }
             },
             y: {
                 ticks: { 
@@ -177,6 +178,7 @@ const formatCurrency = (value) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 };
 
+// Watcher ini sudah benar dan akan memicu loadChartData saat dates berubah
 watch(dates, () => {
     if (dates.value && dates.value[1]) {
         loadChartData();
@@ -188,27 +190,23 @@ onMounted(() => {
     setChartOptions();
 });
 
-definePageMeta({ layout: 'default' });
+const refreshData = async () => {
+    initDates();
+    setChartOptions();
+}
+
+defineExpose({ refreshData });
 </script>
 
 <template>
-    <div class="min-h-screen bg-surface-50 dark:bg-surface-950 p-4 md:p-6 animate-fade-in font-sans">
+    <div class="h-full flex flex-col pt-4">
         
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
-            <div>
-                <h1 class="text-3xl font-black text-surface-900 dark:text-surface-0 tracking-tight">
-                    Analisis Keuangan
-                </h1>
-                <p class="text-surface-500 dark:text-surface-400 mt-1">
-                    Visualisasi tren arus kas masuk dan keluar toko Anda.
-                </p>
-            </div>
-            
-            <div class="w-full lg:w-auto bg-white dark:bg-surface-900 p-1.5 rounded-xl border border-surface-200 dark:border-surface-800 shadow-sm flex flex-col sm:flex-row gap-2">
+            <div class="w-full lg:w-auto bg-white dark:bg-surface-900 p-1.5 rounded-xl border border-surface-200 dark:border-surface-800 shadow-sm flex flex-col sm:flex-row gap-2 ml-auto">
                 <div class="flex gap-1 bg-surface-100 dark:bg-surface-800 p-1 rounded-lg">
-                    <button @click="applyQuickFilter(7)" class="px-3 py-1.5 text-xs font-bold rounded-md transition-colors hover:bg-white hover:shadow-sm text-surface-600">7 Hari</button>
-                    <button @click="applyQuickFilter(30)" class="px-3 py-1.5 text-xs font-bold rounded-md transition-colors bg-white shadow-sm text-primary-600">30 Hari</button>
-                    <button @click="applyQuickFilter('thisMonth')" class="px-3 py-1.5 text-xs font-bold rounded-md transition-colors hover:bg-white hover:shadow-sm text-surface-600">Bulan Ini</button>
+                    <button @click="applyQuickFilter(7)" class="px-3 py-1.5 text-xs font-bold rounded-md transition-colors hover:bg-white hover:shadow-sm text-surface-600 dark:text-surface-300">7 Hari</button>
+                    <button @click="applyQuickFilter(30)" class="px-3 py-1.5 text-xs font-bold rounded-md transition-colors hover:bg-white hover:shadow-sm text-surface-600 dark:text-surface-300">30 Hari</button>
+                    <button @click="applyQuickFilter('thisMonth')" class="px-3 py-1.5 text-xs font-bold rounded-md transition-colors hover:bg-white hover:shadow-sm text-surface-600 dark:text-surface-300">Bulan Ini</button>
                 </div>
 
                 <Calendar 
@@ -227,60 +225,60 @@ definePageMeta({ layout: 'default' });
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             
-            <div class="bg-white dark:bg-surface-900 p-5 rounded-2xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
+            <div class="bg-white dark:bg-surface-900 p-5 rounded-2xl shadow-lg border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="relative z-10">
                     <div class="flex items-center gap-2 mb-2">
-                        <div class="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600">
-                            <i class="pi pi-arrow-up-right text-sm font-bold"></i>
+                        <div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl text-emerald-600 dark:text-emerald-400">
+                            <i class="pi pi-arrow-up-right text-lg font-bold"></i>
                         </div>
                         <span class="text-sm font-bold text-surface-500 uppercase tracking-wide">Pemasukan</span>
                     </div>
-                    <div class="text-2xl font-black text-surface-800 dark:text-surface-100">
+                    <div class="text-3xl font-black text-surface-800 dark:text-surface-100 tracking-tight">
                         {{ formatCurrency(summary.totalSale) }}
                     </div>
-                    <div class="text-xs text-surface-400 mt-1">Total Omset Periode Ini</div>
+                    <div class="text-xs text-surface-400 mt-1">Total Omset Penjualan</div>
                 </div>
-                <i class="pi pi-wallet absolute -right-2 -bottom-4 text-[5rem] text-emerald-500 opacity-10 group-hover:scale-110 transition-transform"></i>
+                <i class="pi pi-wallet absolute -right-4 -bottom-6 text-[7rem] text-emerald-500 opacity-10 group-hover:scale-110 transition-transform"></i>
             </div>
 
-            <div class="bg-white dark:bg-surface-900 p-5 rounded-2xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
+            <div class="bg-white dark:bg-surface-900 p-5 rounded-2xl shadow-lg border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="relative z-10">
                     <div class="flex items-center gap-2 mb-2">
-                        <div class="p-1.5 bg-orange-100 dark:bg-orange-900/30 rounded-lg text-orange-600">
-                            <i class="pi pi-arrow-down-left text-sm font-bold"></i>
+                        <div class="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-xl text-orange-600 dark:text-orange-400">
+                            <i class="pi pi-arrow-down-left text-lg font-bold"></i>
                         </div>
                         <span class="text-sm font-bold text-surface-500 uppercase tracking-wide">Pengeluaran</span>
                     </div>
-                    <div class="text-2xl font-black text-surface-800 dark:text-surface-100">
+                    <div class="text-3xl font-black text-surface-800 dark:text-surface-100 tracking-tight">
                         {{ formatCurrency(summary.totalBuy) }}
                     </div>
                     <div class="text-xs text-surface-400 mt-1">Total Belanja Stok</div>
                 </div>
-                <i class="pi pi-shopping-bag absolute -right-2 -bottom-4 text-[5rem] text-orange-500 opacity-10 group-hover:scale-110 transition-transform"></i>
+                <i class="pi pi-shopping-bag absolute -right-4 -bottom-6 text-[7rem] text-orange-500 opacity-10 group-hover:scale-110 transition-transform"></i>
             </div>
 
-            <div class="bg-gradient-to-br from-primary-600 to-indigo-600 p-5 rounded-2xl shadow-lg shadow-primary-500/20 relative overflow-hidden group text-white">
+            <div class="bg-gradient-to-br from-primary-600 to-indigo-700 p-5 rounded-2xl shadow-xl shadow-primary-500/30 relative overflow-hidden group text-white">
                 <div class="relative z-10">
                     <div class="flex items-center gap-2 mb-2">
-                        <div class="p-1.5 bg-white/20 backdrop-blur-sm rounded-lg text-white">
-                            <i class="pi pi-chart-line text-sm font-bold"></i>
+                        <div class="p-2 bg-white/20 backdrop-blur-sm rounded-xl text-white">
+                            <i class="pi pi-chart-line text-lg font-bold"></i>
                         </div>
-                        <span class="text-sm font-bold text-white/80 uppercase tracking-wide">Margin / Surplus</span>
+                        <span class="text-sm font-bold text-white/90 uppercase tracking-wide">Surplus Bersih</span>
                     </div>
-                    <div class="text-3xl font-black tracking-tight">
+                    <div class="text-4xl font-black tracking-tight" :class="summary.profit < 0 ? 'text-red-300' : 'text-white'">
                         {{ formatCurrency(summary.profit) }}
                     </div>
                     <div class="text-xs text-white/70 mt-1">Selisih Pemasukan & Pengeluaran</div>
                 </div>
-                <i class="pi pi-star absolute -right-2 -bottom-4 text-[6rem] text-white opacity-10 group-hover:rotate-12 transition-transform"></i>
+                <i class="pi pi-dollar absolute -right-4 -bottom-6 text-[7rem] text-white opacity-10 group-hover:rotate-12 transition-transform"></i>
             </div>
         </div>
 
-        <div class="bg-white dark:bg-surface-900 p-6 rounded-2xl shadow-sm border border-surface-200 dark:border-surface-800 relative">
+        <div class="bg-white dark:bg-surface-900 p-6 rounded-2xl shadow-xl border border-surface-200 dark:border-surface-800 relative flex-1">
             <div class="flex justify-between items-center mb-6">
                 <div>
-                    <h3 class="font-bold text-lg text-surface-800 dark:text-surface-100">Tren Performa</h3>
-                    <p class="text-xs text-surface-500">Grafik perbandingan harian</p>
+                    <h3 class="font-bold text-lg text-surface-800 dark:text-surface-100">Tren Performa Periodik</h3>
+                    <p class="text-xs text-surface-500">Grafik perbandingan arus kas masuk vs. keluar</p>
                 </div>
                 <Button icon="pi pi-download" severity="secondary" text rounded v-tooltip.top="'Download Image'" />
             </div>
@@ -288,7 +286,7 @@ definePageMeta({ layout: 'default' });
             <div v-if="loading" class="absolute inset-0 bg-white/80 dark:bg-surface-900/80 z-20 flex items-center justify-center backdrop-blur-sm rounded-2xl">
                 <div class="flex flex-col items-center gap-3">
                     <ProgressSpinner style="width: 40px; height: 40px" strokeWidth="4" />
-                    <span class="text-xs font-bold text-surface-500">Memuat data...</span>
+                    <span class="text-xs font-bold text-surface-500">Memuat data analisis...</span>
                 </div>
             </div>
             
@@ -299,13 +297,3 @@ definePageMeta({ layout: 'default' });
 
     </div>
 </template>
-
-<style scoped>
-.animate-fade-in {
-    animation: fadeIn 0.5s ease-in-out;
-}
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-</style>

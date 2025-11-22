@@ -32,36 +32,20 @@ export const useProductService = () => {
         });
     };
 
-    // ... (Sisa method addStock, reduceStock, addPrice, addUnit TETAP SAMA) ...
-    // Copy-paste method sub-fitur yang lama di sini
-    const addStock = async (uuid: string, qty: number) => {
-        return await useApi(`${API_BASE}/add-stok/${uuid}`, {
-            method: 'POST',
-            body: { qty }
-        });
-    };
-
-    const reduceStock = async (uuid: string, qty: number) => {
-        return await useApi(`${API_BASE}/reduce-stok/${uuid}`, {
-            method: 'POST',
-            body: { qty }
-        });
-    };
-
     const addPrice = async (uuid: string, payload: any) => {
         return await useApi(`${API_BASE}/add-price/${uuid}`, {
             method: 'POST',
             body: { ...payload }
         });
     };
-    
+
     const addUnit = async (uuid: string, payload: any) => {
         return await useApi(`${API_BASE}/add-unit/${uuid}`, {
             method: 'POST',
             body: { ...payload }
         });
     };
-    
+
     const deleteUnit = async (unitUuid: string) => {
         return await useApi(`${API_BASE}/delete-unit/${unitUuid}`, {
             method: 'DELETE',
@@ -74,8 +58,6 @@ export const useProductService = () => {
         createProduct,
         updateProduct,
         deleteProduct,
-        addStock,
-        reduceStock,
         addPrice,
         addUnit,
         deleteUnit
