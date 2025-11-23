@@ -454,13 +454,13 @@ defineExpose({ refreshData });
             </div>
         </div>
 
-        <div class="w-[320px] flex flex-col bg-surface-500 text-white rounded-xl shadow-lg overflow-hidden shrink-0 relative">
+        <div class="w-[320px] flex flex-col rounded-xl shadow-lg overflow-hidden shrink-0 relative">
              <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
              
              <div class="p-4 flex-1 flex flex-col gap-5 relative z-10">
                 <div class="text-center pt-2">
                     <h3 class="text-surface-400 text-xs uppercase tracking-widest font-bold mb-1">Total Harus Dibayar</h3>
-                    <div class="text-3xl font-black tracking-tight text-white">
+                    <div class="text-3xl font-black tracking-tight">
                         {{ formatCurrency(grandTotal) }}
                     </div>
                 </div>
@@ -468,12 +468,12 @@ defineExpose({ refreshData });
                 <div class="bg-surface-800/50 p-3 rounded-xl border border-surface-700/50">
                     <label class="text-[10px] text-surface-400 uppercase font-bold mb-2 block">Uang Diterima (Cash)</label>
                     <InputNumber v-model="payment.amount" mode="currency" currency="IDR" locale="id-ID" 
-                        class="w-full" placeholder="0" :min="0" autofocus inputClass="!text-base !py-2.5 !px-3 !font-mono !rounded-lg !bg-surface-800 !text-white !border-surface-700 focus:!border-primary-500 focus:!ring-1 !h-11" />
+                        class="w-full" placeholder="0" :min="0" autofocus inputClass="!text-base !py-2.5 !px-3 !font-mono !rounded-lg !border-surface-700 focus:!border-primary-500 focus:!ring-1 !h-11" />
                     
                     <div class="grid grid-cols-2 gap-2 mt-2">
-                         <button class="py-1.5 bg-surface-700 hover:bg-surface-600 rounded text-[10px] font-bold transition-colors border border-surface-600" @click="payment.amount = grandTotal">Uang Pas</button>
-                         <button class="py-1.5 bg-surface-700 hover:bg-surface-600 rounded text-[10px] font-bold transition-colors border border-surface-600" @click="payment.amount = 50000">50.000</button>
-                         <button class="py-1.5 bg-surface-700 hover:bg-surface-600 rounded text-[10px] font-bold transition-colors border border-surface-600" @click="payment.amount = 100000">100.000</button>
+                         <button class="py-1.5 rounded text-[10px] font-bold transition-colors border border-surface-600" @click="payment.amount = grandTotal">Uang Pas</button>
+                         <button class="py-1.5 rounded text-[10px] font-bold transition-colors border border-surface-600" @click="payment.amount = 50000">50.000</button>
+                         <button class="py-1.5 rounded text-[10px] font-bold transition-colors border border-surface-600" @click="payment.amount = 100000">100.000</button>
                          <button class="py-1.5 bg-red-900/40 text-red-300 hover:bg-red-900/60 rounded text-[10px] font-bold transition-colors border border-red-900/50" @click="payment.amount = null">Clear</button>
                     </div>
                 </div>
@@ -487,7 +487,7 @@ defineExpose({ refreshData });
                 </div>
              </div>
 
-             <div class="p-4 bg-surface-500 relative z-10">
+             <div class="p-4 relative z-10">
                 <Button label="PROSES BAYAR" icon="pi pi-print" 
                     class="w-full font-black !py-3 !text-sm !bg-emerald-500 hover:!bg-emerald-600 !border-none !text-white shadow-lg shadow-emerald-900/50 active:translate-y-0.5 transition-all" 
                     :disabled="!canCheckout" :loading="processing" @click="processCheckout" size="large" />

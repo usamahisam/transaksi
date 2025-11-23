@@ -1,7 +1,7 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
@@ -14,11 +14,10 @@ import { ProductPriceEntity } from '../product_price/product_price.entity';
 import { ProductShelvePivotEntity } from '../product_shelve_pivot/product_shelve_pivot.entity';
 import { ProductCategoryPivotEntity } from '../product_category_pivot/product_category_pivot.entity';
 import { UserEntity } from '../user/user.entity';
-import { StoreEntity } from '../store/store.entity';
 
 @Entity('product')
 export class ProductEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn('varchar', { length: 60 })
   uuid: string;
 
   @Column({ length: 500 })
@@ -59,13 +58,6 @@ export class ProductEntity {
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'deleted_by' })
   deletedByUser?: UserEntity;
-
-  @Column({ name: 'store_uuid', type: 'uuid' })
-  storeUuid: string;
-
-  @ManyToOne(() => StoreEntity, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'store_uuid' })
-  store: StoreEntity;
 
   @OneToMany(() => ProductUnitEntity, (unit) => unit.product)
   units: ProductUnitEntity[];

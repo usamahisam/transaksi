@@ -79,9 +79,12 @@ const handleInstall = async () => {
 
         // Response: { store, user, tokens }
         // Simpan Token
-        const tokenCookie = useCookie('accessToken', { maxAge: 60 * 60 * 24 * 7 });
+        // NOTE: Token disimpan agar proses instalasi tidak langsung diredirect oleh middleware,
+        // namun akan dihapus di fungsi goToLogin.
+        const tokenCookie = useCookie('accessToken', { maxAge: 60 * 60 * 24 * 7, path: '/' });
+        const refreshTokenCookie = useCookie('refreshToken', { maxAge: 60 * 60 * 24 * 7, path: '/' });
         tokenCookie.value = response.tokens.accessToken;
-        // (Optional) Simpan refresh token juga jika ada
+        refreshTokenCookie.value = response.tokens.refreshToken;
 
         toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Sistem siap digunakan!', life: 3000 });
         activeStep.value++; // Ke Step 3
@@ -95,9 +98,16 @@ const handleInstall = async () => {
     }
 };
 
-const goToDashboard = () => {
-    // Hard reload untuk refresh state
-    window.location.href = '/';
+// --- FUNGSI BARU UNTUK SELESAI DAN KE HALAMAN LOGIN ---
+const goToLogin = () => {
+    // 1. Hapus semua token yang tersimpan saat instalasi
+    const accessToken = useCookie('accessToken');
+    const refreshToken = useCookie('refreshToken');
+    accessToken.value = null;
+    refreshToken.value = null;
+
+    // 2. Arahkan ke halaman login
+    router.push('/login');
 };
 </script>
 
@@ -182,9 +192,9 @@ const goToDashboard = () => {
                     <h2 class="text-3xl font-bold text-surface-900 dark:text-surface-0 mb-3">Instalasi Berhasil!</h2>
                     <p class="text-surface-500 mb-8 max-w-md leading-relaxed">
                         Toko <strong>{{ form.storeName }}</strong> telah dibuat.<br>
-                        Anda sudah login otomatis sebagai <strong>{{ form.username }}</strong>.
+                        Silakan login menggunakan akun <strong>{{ form.username }}</strong> yang telah dibuat.
                     </p>
-                    <Button label="Masuk Dashboard" icon="pi pi-home" size="large" @click="goToDashboard" class="px-8 py-3 shadow-lg shadow-primary-500/30" />
+                    <Button label="Masuk Halaman Login" icon="pi pi-sign-in" size="large" @click="goToLogin" class="px-8 py-3 shadow-lg shadow-primary-500/30" />
                 </div>
 
             </div>

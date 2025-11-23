@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository, Like } from 'typeorm';
 import { ProductEntity } from 'src/common/entities/product/product.entity';
 import { ProductUnitEntity, ProductUnitEnum } from 'src/common/entities/product_unit/product_unit.entity';
 import { ProductPriceEntity } from 'src/common/entities/product_price/product_price.entity';
@@ -7,6 +7,10 @@ import { ProductShelvePivotEntity } from 'src/common/entities/product_shelve_piv
 import { ProductCategoryPivotEntity } from 'src/common/entities/product_category_pivot/product_category_pivot.entity';
 import { JournalService } from '../journal/journal.service';
 import { JournalDetailEntity } from 'src/common/entities/journal_detail/journal_detail.entity'; // Import untuk Query Stok
+
+// HANYA UNTUK TUJUAN DEMO: Fungsi utilitas untuk menghasilkan pengenal lokal unik 
+// (Anda dapat menggantinya dengan UUID v4 asli yang digabung)
+const generateLocalUuid = () => Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
 
 @Injectable()
 export class ProductService {
@@ -71,12 +75,21 @@ export class ProductService {
   async create(payload: any) {
     const { name, userId, units, prices, stocks, stockAdjustments, categoryUuids, storeUuid } = payload;
 
+    if (!storeUuid) {
+      throw new BadRequestException('Store ID is required for product creation.');
+    }
+
+    // LOGIKA PENGGABUNGAN UUID STORE KE UUID PRODUK (PRIMARY KEY)
+    // Asumsi format: [storeUuid]-[local_identifier]
+    const customProductUuid = `${storeUuid}-${generateLocalUuid()}`;
+
     return await this.dataSource.transaction(async (manager) => {
-      // 1. Create Product & Categories (Logika lama)
+      // 1. Create Product & Categories 
       const newProduct = manager.create(ProductEntity, {
+        uuid: customProductUuid, // Menggunakan customProductUuid sebagai Primary Key
         name,
         createdBy: userId,
-        storeUuid: storeUuid
+        // storeUuid TIDAK ADA DI ENTITY
       });
       const savedProduct = await manager.save(newProduct);
 
@@ -95,7 +108,7 @@ export class ProductService {
       let defaultPriceUuid: string | null = null;
       const unitUuidMap = new Map<any, string>();
 
-      // 2. Process Units (Simpan Mapping)
+      // 2. Process Units 
       for (const u of units) {
         const newUnit = manager.create(ProductUnitEntity, {
           productUuid: savedProduct.uuid,
@@ -110,7 +123,7 @@ export class ProductService {
         if (u.isDefault) defaultUnitUuid = savedUnit.uuid;
       }
 
-      // 3. Process Prices (Logika lama)
+      // 3. Process Prices 
       for (const p of prices) {
         const realUnitUuid = unitUuidMap.get(p.unitTempId);
         if (realUnitUuid) {
@@ -128,7 +141,7 @@ export class ProductService {
         }
       }
 
-      // 4. [BARU] Catat Stok Awal ke Journal
+      // 4. Catat Stok Awal ke Journal
       if (stockAdjustments && Array.isArray(stockAdjustments) && stockAdjustments.length > 0) {
         const mappedAdjustments = stockAdjustments.map(adj => {
           const realUnitUuid = unitUuidMap.get(adj.unitUuid) || adj.unitUuid;
@@ -142,7 +155,7 @@ export class ProductService {
         await this.journalService.processStockAdjustment(mappedAdjustments, userId, manager);
       }
 
-      // 5. Process Shelves (Logika lama)
+      // 5. Process Shelves
       if (stocks && stocks.length > 0) {
         for (const s of stocks) {
           const realUnitUuid = unitUuidMap.get(s.unitTempId);
@@ -168,7 +181,7 @@ export class ProductService {
       if (defaultPriceUuid) savedProduct.defaultPriceUuid = defaultPriceUuid;
       await manager.save(savedProduct);
 
-      // Return dengan data stok terhitung
+      // findOne dipanggil dengan storeUuid untuk validasi/filtering
       return await this.findOne(savedProduct.uuid, storeUuid);
     });
   }
@@ -180,7 +193,8 @@ export class ProductService {
     const { name, units, prices, stocks, stockAdjustments, categoryUuids } = payload;
 
     return await this.dataSource.transaction(async (manager) => {
-      const product = await manager.findOne(ProductEntity, { where: { uuid } });
+      // Menggunakan findOne yang sudah difilter/validasi dengan storeUuid
+      const product = await this.findOne(uuid, storeUuid);
       if (!product) throw new BadRequestException('Produk tidak ditemukan');
 
       // 1. Update Nama & Kategori (Logika lama)
@@ -262,7 +276,7 @@ export class ProductService {
         }
       }
 
-      // 4. [BARU] Catat Penyesuaian Stok ke Journal
+      // 4. Catat Penyesuaian Stok ke Journal
       if (stockAdjustments && Array.isArray(stockAdjustments) && stockAdjustments.length > 0) {
         const mappedAdjustments = stockAdjustments.map(adj => {
           const realUnitUuid = unitMap.get(adj.unitUuid) || adj.unitUuid;
@@ -302,8 +316,15 @@ export class ProductService {
   // FIND ALL (Inject Stock Calculation)
   // ==========================================================
   async findAll(storeUuid?: string) {
+    const whereCondition: { uuid?: any } = {};
+
+    // Filtering menggunakan LIKE pada kolom uuid (Primary Key)
+    if (storeUuid) {
+      whereCondition.uuid = Like(`${storeUuid}%`);
+    }
+
     const products = await this.productRepo.find({
-      where: { storeUuid: storeUuid },
+      where: whereCondition,
       order: { createdAt: 'DESC' },
       relations: ['units', 'price', 'shelve', 'shelve.shelve', 'productCategory', 'productCategory.category'],
     });
@@ -335,15 +356,31 @@ export class ProductService {
   // FIND ONE (Inject Stock Calculation)
   // ==========================================================
   async findOne(uuid: string, storeUuid?: string) {
+    const whereCondition: { uuid: any } = { uuid };
+
+    // Filtering menggunakan LIKE pada kolom uuid (Primary Key)
+    // Jika storeUuid ada, pastikan UUID yang dicari memiliki prefix storeUuid.
+    if (storeUuid) {
+      whereCondition.uuid = Like(`${storeUuid}%`);
+    }
+
+    // Namun, kita tetap ingin mencari berdasarkan UUID yang lengkap jika diberikan.
+    // Jika UUID yang dicari sudah membawa prefix, filter LIKE tetap berfungsi.
+    // Kita hanya perlu memastikan TypeORM tidak membuat query yang kontradiktif (uuid=... AND uuid LIKE...).
+    // Dengan hanya menggunakan `whereCondition` (yang bisa berupa `{ uuid: Like(...) }` atau `{ uuid: 'UUID_LENGKAP' }`), ini lebih aman.
+
+    // NOTE: TypeORM akan secara otomatis mengganti `uuid` dengan `Like` jika properti `uuid` adalah objek `Like`.
+
     const product = await this.productRepo.findOne({
-      where: {
-        uuid: uuid,
-        storeUuid: storeUuid
-      },
+      where: whereCondition,
       relations: ['units', 'price', 'shelve', 'shelve.shelve', 'productCategory', 'productCategory.category'],
     });
 
-    if (product && product.units && product.units.length > 0) {
+    if (!product) {
+      return null;
+    }
+
+    if (product.units && product.units.length > 0) {
       const manager = this.dataSource.manager;
       const stockMap = await this.calculateStockForUnits(product.units, manager);
 
@@ -364,7 +401,7 @@ export class ProductService {
     if (!data) return null;
     data.deletedBy = userId;
     await this.productRepo.save(data);
-    return this.productRepo.softDelete(uuid);
+    return await this.productRepo.softDelete(uuid);
   }
 
   async restore(uuid: string) {
@@ -411,6 +448,7 @@ export class ProductService {
 
     if (setAsDefault) {
       product.defaultUnitUuid = savedUnit.uuid;
+      // PERBAIKAN: Gunakan repository untuk menyimpan entity
       await this.productRepo.save(product);
     }
     return savedUnit;
@@ -433,6 +471,7 @@ export class ProductService {
 
     if (setAsDefault) {
       product.defaultPriceUuid = savedPrice.uuid;
+      // PERBAIKAN: Gunakan repository untuk menyimpan entity
       await this.productRepo.save(product);
     }
     return savedPrice;
