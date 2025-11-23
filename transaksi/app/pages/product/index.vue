@@ -168,4 +168,7 @@ button {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
 }
+/* Catatan: Class .global-tab-active dan .global-tab-inactive sudah didefinisikan 
+   di base.css dan menggunakan dark:bg-surface-800 dan dark:border-surface-700 
+   yang menjamin dukungan Dark Mode pada tombol tab. */
 </style>

@@ -227,10 +227,11 @@ const getDefaultUnitName = (prod) => {
     return defaultUnit?.unitName;
 };
 
+// FIX: Menambahkan kelas dark mode ke helper stok
 const getStockColor = (qty) => {
-    if (qty <= 0) return 'bg-red-100 text-red-600 border-red-200';
-    if (qty < 10) return 'bg-amber-100 text-amber-600 border-amber-200';
-    return 'bg-blue-50 text-blue-600 border-blue-200';
+    if (qty <= 0) return 'bg-red-100 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
+    if (qty < 10) return 'bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800';
+    return 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
 };
 
 onMounted(async () => {
@@ -251,8 +252,9 @@ defineExpose({ refreshData });
 
 <template>
     <div class="flex flex-col lg:flex-row h-full gap-4 p-4 overflow-hidden bg-surface-50 dark:bg-surface-950 font-sans">
-        <div class="flex-1 flex flex-col bg-white dark:bg-surface-900 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden">
-            <div class="p-3 border-b border-surface-100 dark:border-surface-800 flex flex-col md:flex-row gap-2 bg-surface-50/50">
+        
+        <div class="flex-1 flex flex-col dark:bg-surface-900 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden">
+            <div class="p-3 border-b border-surface-100 dark:border-surface-800 flex flex-col md:flex-row gap-2 bg-surface-50/50 dark:bg-surface-950/50">
                 
                 <div class="w-full md:w-48">
                     <MultiSelect 
@@ -263,11 +265,11 @@ defineExpose({ refreshData });
                         placeholder="Filter Kategori" 
                         display="chip" 
                         :maxSelectedLabels="1" 
-                        class="w-full !h-10 !text-sm"
+                        class="w-full !h-10 !text-sm dark:bg-surface-800 border border-surface-200 dark:border-surface-700 "
                         :pt="{ label: { class: '!py-2 !px-3' } }"
                     >
                         <template #option="slotProps">
-                            <div class="flex align-items-center">
+                            <div class="flex align-items-center text-surface-700 dark:text-surface-200">
                                 <i class="pi pi-tag mr-2 text-orange-500 text-xs"></i>
                                 <span class="text-sm">{{ slotProps.option.name }}</span>
                             </div>
@@ -276,13 +278,13 @@ defineExpose({ refreshData });
                 </div>
 
                 <div class="relative flex-1">
-                    <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 text-sm"></i>
+                    <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 dark:text-surface-500 text-sm"></i>
                     <input 
                         id="search-input-sale"
                         v-model="searchQuery" 
                         type="text"
                         placeholder="Cari Produk / Scan Barcode... (F2)" 
-                        class="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/30 transition-all shadow-sm h-10"
+                        class="w-full pl-9 pr-3 py-2 text-sm dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/30 transition-all shadow-sm h-10"
                         @keydown="onSearchKeydown" 
                         @input="handleSearch"
                         autocomplete="off"
@@ -299,7 +301,7 @@ defineExpose({ refreshData });
                 <div v-else-if="filteredProducts.length > 0" class="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
                     <div v-for="prod in filteredProducts" :key="prod.uuid"
                         @click="addToCart(prod)"
-                        class="group relative bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl p-3 cursor-pointer hover:border-primary-400 hover:shadow-md transition-all active:scale-95 select-none flex flex-col justify-between h-28"
+                        class="group relative dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl p-3 cursor-pointer hover:border-primary-400 hover:shadow-md transition-all active:scale-95 select-none flex flex-col justify-between h-28"
                     >
                         <div>
                             <div class="text-xs font-bold text-surface-700 dark:text-surface-200 line-clamp-2 mb-1 leading-snug group-hover:text-primary-600 transition-colors">
@@ -309,7 +311,7 @@ defineExpose({ refreshData });
                                 <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded border" :class="getStockColor(getDefaultUnitStock(prod))">
                                     Stok: {{ getDefaultUnitStock(prod) }}
                                 </span>
-                                <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-surface-100 text-surface-500 border border-surface-200">
+                                <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-700 text-surface-500 dark:text-surface-400 border border-surface-200 dark:border-surface-600">
                                     {{ getDefaultUnitName(prod) }}
                                 </span>
                             </div>
@@ -330,34 +332,36 @@ defineExpose({ refreshData });
                     </div>
                 </div>
 
-                <div v-else class="flex flex-col items-center justify-center h-full text-surface-400 gap-2 opacity-60">
+                <div v-else class="flex flex-col items-center justify-center h-full text-surface-400 dark:text-surface-600 gap-2 opacity-60">
                     <i class="pi pi-box text-4xl"></i>
                     <span class="text-xs">Produk tidak ditemukan</span>
                 </div>
             </div>
         </div>
 
-        <div class="w-[380px] flex flex-col bg-white dark:bg-surface-900 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden shrink-0">
-            <div class="p-3 border-b border-surface-100 dark:border-surface-700 bg-surface-50/50 flex justify-between items-center">
+        <div class="w-[380px] flex flex-col dark:bg-surface-900 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden shrink-0">
+            <div class="p-3 border-b border-surface-100 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-950/50 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <div class="w-7 h-7 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center">
                         <span class="font-bold text-xs">{{ totalItems }}</span>
                     </div>
-                    <span class="font-bold text-sm text-surface-700">Keranjang</span>
+                    <span class="font-bold text-sm text-surface-700 dark:text-surface-200">Keranjang</span>
                 </div>
                 <Button icon="pi pi-trash" text severity="danger" size="small" class="!w-8 !h-8" v-tooltip.left="'Kosongkan'" @click="cart = []" :disabled="cart.length === 0" />
             </div>
 
-            <div id="cart-items-container" class="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-thin bg-surface-50/30">
-                <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-surface-300 gap-3">
-                    <div class="w-16 h-16 bg-surface-100 rounded-full flex items-center justify-center">
+            <div id="cart-items-container" class="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-thin bg-surface-50/30 dark:bg-surface-950/30">
+                <div v-if="cart.length === 0" class="h-full flex flex-col items-center justify-center text-surface-300 dark:text-surface-700 gap-3">
+                    <div class="w-16 h-16 bg-surface-100 dark:bg-surface-800 rounded-full flex items-center justify-center">
                         <i class="pi pi-shopping-cart text-2xl opacity-40"></i>
                     </div>
                     <p class="text-xs">Belum ada item</p>
                 </div>
 
-                <div v-for="(item, index) in cart" :key="index" class="group bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl p-2.5 hover:border-primary-300 transition-all shadow-sm relative">
-                    <button class="absolute -top-2 -right-2 bg-white shadow border border-surface-200 text-surface-400 hover:text-red-500 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10" @click="removeFromCart(index)">
+                <div v-for="(item, index) in cart" :key="index" 
+                     class="group dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl p-2.5 hover:border-primary-300 dark:hover:border-primary-600 transition-all shadow-sm relative">
+                    
+                    <button class="absolute -top-2 -right-2 dark:bg-surface-900 shadow border border-surface-200 dark:border-surface-700 text-surface-400 dark:text-surface-500 hover:text-red-500 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-10" @click="removeFromCart(index)">
                         <i class="pi pi-times text-[10px] font-bold"></i>
                     </button>
 
@@ -411,11 +415,11 @@ defineExpose({ refreshData });
 
                         <div class="flex flex-col items-end gap-1.5">
                             <div class="flex items-center bg-surface-100 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-600 h-7">
-                                <button class="w-7 h-full flex items-center justify-center hover:bg-white rounded-l-lg transition text-surface-600 hover:text-red-500" @click="item.qty > 1 ? item.qty-- : removeFromCart(index)">
+                                <button class="w-7 h-full flex items-center justify-center hover:dark:hover:bg-surface-800 rounded-l-lg transition text-surface-600 dark:text-surface-400 hover:text-red-500" @click="item.qty > 1 ? item.qty-- : removeFromCart(index)">
                                     <i class="pi pi-minus text-[9px] font-bold"></i>
                                 </button>
-                                <input v-model="item.qty" type="number" class="w-8 h-full bg-transparent text-center text-xs font-bold border-none outline-none appearance-none m-0 p-0" min="1" />
-                                <button class="w-7 h-full flex items-center justify-center hover:bg-white rounded-r-lg transition text-primary-600" @click="item.qty++">
+                                <input v-model="item.qty" type="number" class="w-8 h-full bg-transparent text-center text-xs font-bold border-none outline-none appearance-none m-0 p-0 text-surface-800 dark:text-surface-100" min="1" />
+                                <button class="w-7 h-full flex items-center justify-center hover:dark:hover:bg-surface-800 rounded-r-lg transition text-primary-600" @click="item.qty++">
                                     <i class="pi pi-plus text-[9px] font-bold"></i>
                                 </button>
                             </div>
@@ -427,36 +431,38 @@ defineExpose({ refreshData });
                 </div>
             </div>
 
-            <div class="p-3 bg-surface-50 dark:bg-surface-800 border-t border-surface-200 dark:border-surface-700 space-y-2">
+            <div class="p-3 dark:bg-surface-800 border-t border-surface-200 dark:border-surface-700 space-y-2">
                 
                 <div v-if="taxEnabled" class="space-y-1 border-b border-dashed border-surface-300 dark:border-surface-600 pb-2 mb-2">
-                    <div class="flex justify-between items-center text-xs text-surface-500">
+                    <div class="flex justify-between items-center text-xs text-surface-500 dark:text-surface-400">
                         <span>Subtotal</span>
                         <span>{{ formatCurrency(cartSubtotal) }}</span>
                     </div>
-                    <div class="flex justify-between items-center text-xs text-surface-500">
+                    <div class="flex justify-between items-center text-xs text-surface-500 dark:text-surface-400">
                         <span>
                             Pajak ({{ taxRate }}%) 
-                            <span v-if="taxMethod === 'inclusive'" class="text-[9px] bg-surface-200 px-1 rounded ml-1">Include</span>
+                            <span v-if="taxMethod === 'inclusive'" class="text-[9px] bg-surface-200 dark:bg-surface-700 px-1 rounded ml-1">Include</span>
                         </span>
                         <span>{{ formatCurrency(taxAmount) }}</span>
                     </div>
                 </div>
 
                 <div class="flex justify-between items-end">
-                    <span class="text-xs text-surface-500 uppercase font-bold tracking-wider mb-1">Total Tagihan</span>
-                    <span class="text-xl font-black text-primary-600">{{ formatCurrency(grandTotal) }}</span>
+                    <span class="text-xs text-surface-500 dark:text-surface-400 uppercase font-bold tracking-wider mb-1">Total Tagihan</span>
+                    <span class="text-xl font-black text-primary-600 dark:text-primary-400">{{ formatCurrency(grandTotal) }}</span>
                 </div>
             </div>
         </div>
 
-        <div class="w-[320px] flex flex-col bg-surface-900 text-white rounded-xl shadow-lg overflow-hidden shrink-0 relative">
+        <div class="w-[320px] flex flex-col bg-surface-500 text-white rounded-xl shadow-lg overflow-hidden shrink-0 relative">
              <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
              
              <div class="p-4 flex-1 flex flex-col gap-5 relative z-10">
                 <div class="text-center pt-2">
                     <h3 class="text-surface-400 text-xs uppercase tracking-widest font-bold mb-1">Total Harus Dibayar</h3>
-                    <div class="text-3xl font-black tracking-tight text-white">{{ formatCurrency(grandTotal) }}</div>
+                    <div class="text-3xl font-black tracking-tight text-white">
+                        {{ formatCurrency(grandTotal) }}
+                    </div>
                 </div>
 
                 <div class="bg-surface-800/50 p-3 rounded-xl border border-surface-700/50">
@@ -481,7 +487,7 @@ defineExpose({ refreshData });
                 </div>
              </div>
 
-             <div class="p-4 bg-surface-950 relative z-10">
+             <div class="p-4 bg-surface-500 relative z-10">
                 <Button label="PROSES BAYAR" icon="pi pi-print" 
                     class="w-full font-black !py-3 !text-sm !bg-emerald-500 hover:!bg-emerald-600 !border-none !text-white shadow-lg shadow-emerald-900/50 active:translate-y-0.5 transition-all" 
                     :disabled="!canCheckout" :loading="processing" @click="processCheckout" size="large" />

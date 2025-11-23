@@ -93,7 +93,7 @@ defineExpose({ refresh: fetchShelves });
         </div>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            <div @click="emit('create')" class="bg-white dark:bg-surface-900 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 p-6 flex flex-col items-center justify-center text-center h-56 border-dashed border-2 cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors group">
+            <div @click="emit('create')" class="rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 p-6 flex flex-col items-center justify-center text-center h-56 border-dashed border-2 cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors group">
                 <div class="w-12 h-12 rounded-full bg-surface-100 dark:bg-surface-800 group-hover:bg-primary-50 text-surface-400 group-hover:text-primary-500 flex items-center justify-center mb-3 transition-colors">
                     <i class="pi pi-plus text-xl"></i>
                 </div>
@@ -102,7 +102,7 @@ defineExpose({ refresh: fetchShelves });
 
             <div v-for="shelf in shelves" :key="shelf.uuid" 
                 @click="openDetail(shelf)"
-                class="bg-white dark:bg-surface-900 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden group hover:shadow-md hover:border-primary-300 transition-all relative cursor-pointer h-56 flex flex-col"
+                class="rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden group hover:shadow-md hover:border-primary-300 transition-all relative cursor-pointer h-56 flex flex-col"
             >
                 <div class="h-1.5 bg-gradient-to-r from-blue-400 to-blue-600 w-full"></div>
                 <div class="p-5 flex flex-col flex-1">
@@ -178,7 +178,7 @@ defineExpose({ refresh: fetchShelves });
                                         <th class="px-4 py-2 text-right">Jumlah (Qty)</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-surface-100 dark:divide-surface-700 bg-white dark:bg-surface-900">
+                                <tbody class="divide-y divide-surface-100 dark:divide-surface-700">
                                     <tr v-for="item in selectedShelf.productShelves" :key="item.uuid" class="hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors">
                                         <td class="px-4 py-2 font-medium text-surface-700 dark:text-surface-100">
                                             {{ item.product?.name || 'Produk Terhapus' }}

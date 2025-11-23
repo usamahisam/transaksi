@@ -202,7 +202,7 @@ defineExpose({ refreshData });
     <div class="h-full flex flex-col pt-4">
         
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
-            <div class="w-full lg:w-auto bg-white dark:bg-surface-900 p-1.5 rounded-xl border border-surface-200 dark:border-surface-800 shadow-sm flex flex-col sm:flex-row gap-2 ml-auto">
+            <div class="w-full lg:w-auto p-1.5 rounded-xl border border-surface-200 dark:border-surface-800 shadow-sm flex flex-col sm:flex-row gap-2 ml-auto">
                 <div class="flex gap-1 bg-surface-100 dark:bg-surface-800 p-1 rounded-lg">
                     <button @click="applyQuickFilter(7)" class="px-3 py-1.5 text-xs font-bold rounded-md transition-colors hover:bg-white hover:shadow-sm text-surface-600 dark:text-surface-300">7 Hari</button>
                     <button @click="applyQuickFilter(30)" class="px-3 py-1.5 text-xs font-bold rounded-md transition-colors hover:bg-white hover:shadow-sm text-surface-600 dark:text-surface-300">30 Hari</button>
@@ -225,7 +225,7 @@ defineExpose({ refreshData });
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             
-            <div class="bg-white dark:bg-surface-900 p-5 rounded-2xl shadow-lg border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
+            <div class="p-5 rounded-2xl shadow-lg border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="relative z-10">
                     <div class="flex items-center gap-2 mb-2">
                         <div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl text-emerald-600 dark:text-emerald-400">
@@ -241,7 +241,7 @@ defineExpose({ refreshData });
                 <i class="pi pi-wallet absolute -right-4 -bottom-6 text-[7rem] text-emerald-500 opacity-10 group-hover:scale-110 transition-transform"></i>
             </div>
 
-            <div class="bg-white dark:bg-surface-900 p-5 rounded-2xl shadow-lg border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
+            <div class="p-5 rounded-2xl shadow-lg border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="relative z-10">
                     <div class="flex items-center gap-2 mb-2">
                         <div class="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-xl text-orange-600 dark:text-orange-400">
@@ -274,7 +274,7 @@ defineExpose({ refreshData });
             </div>
         </div>
 
-        <div class="bg-white dark:bg-surface-900 p-6 rounded-2xl shadow-xl border border-surface-200 dark:border-surface-800 relative flex-1">
+        <div class="p-6 rounded-2xl shadow-xl border border-surface-200 dark:border-surface-800 relative flex-1">
             <div class="flex justify-between items-center mb-6">
                 <div>
                     <h3 class="font-bold text-lg text-surface-800 dark:text-surface-100">Tren Performa Periodik</h3>

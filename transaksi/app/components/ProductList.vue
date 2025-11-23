@@ -58,17 +58,17 @@ const confirmDelete = (prod) => {
 const formatCurrency = (val) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
 const getPricesForUnit = (all, uid) => all.filter(p => p.unitUuid === uid);
 
-// [BARU] Helper untuk mendapatkan total stok unit (currentStock)
+// Helper untuk mendapatkan total stok unit (currentStock)
 const getCurrentStock = (unit) => {
-    // currentStock adalah properti virtual yang disuntikkan oleh ProductService di backend
     return unit.currentStock || 0; 
 };
 
-// [BARU] Helper untuk menentukan warna Stok berdasarkan Qty (Memanfaatkan currentStock)
+// Helper untuk menentukan warna Stok berdasarkan Qty (Memanfaatkan currentStock)
 const getStockColor = (qty) => {
-    if (qty <= 0) return 'bg-red-100 text-red-600 border-red-200';
-    if (qty < 10) return 'bg-amber-100 text-amber-600 border-amber-200';
-    return 'bg-blue-50 text-blue-600 border-blue-200';
+    // Memastikan kelas warna latar belakang dan teks adaptif
+    if (qty <= 0) return 'bg-red-100 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
+    if (qty < 10) return 'bg-amber-100 text-amber-600 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800';
+    return 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
 };
 
 const getUniqueShelves = (product) => {
@@ -90,7 +90,7 @@ defineExpose({ refresh: fetchProducts });
     <div class="animate-fade-in">
         <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
             <div class="relative w-full md:w-96">
-                <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400"></i>
+                <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 dark:text-surface-500"></i>
                 <InputText v-model="filters['global'].value" placeholder="Cari Nama Produk / Barcode..." class="w-full pl-10 !rounded-full shadow-sm" />
             </div>
             <div class="flex gap-2">
@@ -100,23 +100,25 @@ defineExpose({ refresh: fetchProducts });
         </div>
 
         <div class="card bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 shadow-sm overflow-hidden">
-             <DataTable :value="products" :loading="loading" paginator :rows="10" dataKey="uuid" :filters="filters" stripedRows tableStyle="min-width: 90rem" class="text-sm" :globalFilterFields="['name', 'units.barcode']">
+             
+             <DataTable :value="products" :loading="loading" paginator :rows="10" dataKey="uuid" :filters="filters" stripedRows tableStyle="min-width: 90rem" class="text-sm datatable-dark-safe dark:text-surface-100" :globalFilterFields="['name', 'units.barcode']">
+                
                 <template #empty>
-                    <div class="flex flex-col items-center justify-center py-12 text-surface-400">
+                    <div class="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-600">
                         <i class="pi pi-inbox text-5xl mb-3 opacity-30"></i>
                         <p>Belum ada data produk.</p>
                     </div>
                 </template>
-                
+
                 <Column field="name" header="Informasi Produk" sortable style="width: 18%" class="align-top">
                     <template #body="slotProps">
                         <div class="flex gap-3 py-2">
-                            <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/50 dark:to-blue-800/30 flex items-center justify-center text-blue-600 font-bold text-xl shadow-sm border border-blue-100 shrink-0">
+                            <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/50 dark:to-blue-800/30 flex items-center justify-center text-blue-600 font-bold text-xl shadow-sm border border-blue-100 dark:border-blue-800 shrink-0">
                                 {{ slotProps.data.name.charAt(0).toUpperCase() }}
                             </div>
                             <div>
                                 <div class="font-bold text-base text-surface-800 dark:text-surface-100 leading-tight mb-1">{{ slotProps.data.name }}</div>
-                                <div class="text-xs text-surface-500 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded-full inline-block">{{ slotProps.data.units.length }} Varian Satuan</div>
+                                <div class="text-xs text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded-full inline-block">{{ slotProps.data.units.length }} Varian Satuan</div>
                             </div>
                         </div>
                     </template>
@@ -132,7 +134,7 @@ defineExpose({ refresh: fetchProducts });
                                     {{ cat }}
                                 </span>
                             </template>
-                            <span v-else class="text-xs text-surface-400 italic flex items-center gap-1 mt-1">
+                            <span v-else class="text-xs text-surface-400 dark:text-surface-600 italic flex items-center gap-1 mt-1">
                                 <i class="pi pi-minus text-[10px]"></i> Non-Kategori
                             </span>
                         </div>
@@ -149,7 +151,7 @@ defineExpose({ refresh: fetchProducts });
                                     {{ shelfName }}
                                 </span>
                             </template>
-                            <span v-else class="text-xs text-surface-400 italic flex items-center gap-1 mt-1">
+                            <span v-else class="text-xs text-surface-400 dark:text-surface-600 italic flex items-center gap-1 mt-1">
                                 <i class="pi pi-minus-circle text-[10px]"></i> Belum diatur
                             </span>
                         </div>
@@ -159,25 +161,31 @@ defineExpose({ refresh: fetchProducts });
                 <Column header="Detail Varian (Satuan, Harga, Stok)" style="width: 50%" class="align-top">
                     <template #body="slotProps">
                         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 py-2">
-                            <div v-for="u in slotProps.data.units" :key="u.uuid" class="relative bg-surface-50 dark:bg-surface-800/50 border rounded-lg p-3 flex flex-col gap-2 hover:shadow-md transition-all" :class="u.uuid === slotProps.data.defaultUnitUuid ? 'border-blue-300 ring-1 ring-blue-100' : 'border-surface-200 dark:border-surface-700'">
+                            <div v-for="u in slotProps.data.units" :key="u.uuid" 
+                                 class="relative bg-surface-50 dark:bg-surface-800/50 border rounded-lg p-3 flex flex-col gap-2 hover:shadow-md transition-all" 
+                                 :class="u.uuid === slotProps.data.defaultUnitUuid 
+                                    ? 'border-blue-300 ring-1 ring-blue-100 dark:ring-blue-900' 
+                                    : 'border-surface-200 dark:border-surface-700'">
                                 
-                                <div v-if="u.uuid === slotProps.data.defaultUnitUuid" class="absolute top-0 right-0"><span class="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-bl-lg rounded-tr-lg font-bold shadow-sm">DEFAULT</span></div>
+                                <div v-if="u.uuid === slotProps.data.defaultUnitUuid" class="absolute top-0 right-0">
+                                    <span class="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded-bl-lg rounded-tr-lg font-bold shadow-sm dark:bg-blue-800">DEFAULT</span>
+                                </div>
                                 
                                 <div class="flex justify-between items-center">
                                     <div class="flex items-center gap-2">
                                         <span class="font-bold text-sm text-surface-800 dark:text-surface-100">{{ u.unitName }}</span>
-                                        <span class="text-[10px] text-surface-500 bg-white dark:bg-surface-900 px-1 rounded border border-surface-200">x{{ u.unitMultiplier }}</span>
+                                        <span class="text-[10px] text-surface-500 dark:text-surface-400 bg-white dark:bg-surface-900 px-1 rounded border border-surface-200 dark:border-surface-700">x{{ u.unitMultiplier }}</span>
                                     </div>
                                     <div class="flex items-center gap-1">
-                                        <span class="text-[10px] text-surface-500 uppercase font-bold">Stok:</span>
-                                        <span class="text-sm font-black" :class="getCurrentStock(u) > 0 ? 'text-surface-800 dark:text-surface-200' : 'text-red-500'">
+                                        <span class="text-[10px] text-surface-500 dark:text-surface-400 uppercase font-bold">Stok:</span>
+                                        <span class="text-sm font-black" :class="getCurrentStock(u) > 0 ? 'text-surface-800 dark:text-surface-200' : 'text-red-500 dark:text-red-400'">
                                             {{ getCurrentStock(u) }}
                                         </span>
                                     </div>
                                 </div>
                                 
-                                <div class="flex items-center gap-2 text-xs text-surface-600 bg-white dark:bg-surface-900 p-1.5 rounded border border-dashed border-surface-200 dark:border-surface-700">
-                                    <i class="pi pi-barcode text-surface-400"></i>
+                                <div class="flex items-center gap-2 text-xs text-surface-600 dark:text-surface-300 bg-white dark:bg-surface-900 p-1.5 rounded border border-dashed border-surface-200 dark:border-surface-700">
+                                    <i class="pi pi-barcode text-surface-400 dark:text-surface-500"></i>
                                     <span class="font-mono truncate" :title="u.barcode || 'Tanpa Barcode'">{{ u.barcode || 'Tanpa Barcode' }}</span>
                                 </div>
                                 
@@ -186,7 +194,7 @@ defineExpose({ refresh: fetchProducts });
                                         
                                         <div class="flex justify-between text-xs items-center">
                                             <span class="text-surface-600 dark:text-surface-300 font-semibold">{{ p.name || 'Umum' }}</span>
-                                            <span class="font-bold text-primary-600 text-sm">{{ formatCurrency(p.price) }}</span>
+                                            <span class="font-bold text-primary-600 dark:text-primary-400 text-sm">{{ formatCurrency(p.price) }}</span>
                                         </div>
 
                                         <div v-if="p.minWholesaleQty > 0" class="flex justify-between text-[10px] text-green-600 dark:text-green-400 items-center">
@@ -204,7 +212,7 @@ defineExpose({ refresh: fetchProducts });
                     </template>
                 </Column>
 
-                <Column header="" style="width: 10%" class="align-top text-center">
+                <Column header="" style="width: 10%" class="align-top">
                     <template #body="slotProps">
                         <div class="flex flex-col gap-2 py-2 justify-center h-full">
                             <Button icon="pi pi-pencil" text rounded severity="info" v-tooltip.left="'Edit'" @click="emit('edit', slotProps.data)" />
@@ -218,10 +226,69 @@ defineExpose({ refresh: fetchProducts });
 </template>
 
 <style scoped>
-/* Adjustment agar isi tabel rata atas */
+/* Mengatasi latar belakang tabel utama */
+:deep(.p-datatable) {
+    /* Menjadikan latar belakang transparent dan menghapus latar belakang PrimeVue */
+    background: transparent !important;
+    border-color: transparent !important;
+}
+
+/* Mengatasi latar belakang header */
+:deep(.p-datatable-thead > tr > th) {
+    background-color: var(--p-surface-50) !important; /* Light Mode default */
+    color: var(--p-text-color) !important;
+    border-color: var(--p-surface-200) !important;
+}
+
+/* Memaksa warna header di Dark Mode */
+.dark :deep(.p-datatable-thead > tr > th) {
+    background-color: var(--p-surface-900) !important;
+    color: var(--p-surface-100) !important;
+    border-color: var(--p-surface-800) !important;
+}
+
+/* Mengatasi latar belakang baris */
+:deep(.p-datatable-tbody > tr) {
+    background-color: var(--p-surface-0) !important; /* Light Mode default (putih) */
+    color: var(--p-text-color) !important;
+    border-color: var(--p-surface-200) !important;
+}
+
+/* Mengatasi warna baris ganjil/genap (striped rows) */
+:deep(.p-datatable-tbody .p-row-even) {
+    background-color: var(--p-surface-50) !important; /* Light Mode striped */
+}
+
+/* Memaksa warna baris di Dark Mode */
+.dark :deep(.p-datatable-tbody > tr) {
+    background-color: var(--p-surface-900) !important; /* Default Dark Row */
+}
+.dark :deep(.p-datatable-tbody .p-row-even) {
+    background-color: var(--p-surface-950) !important; /* Striped Dark Row (Genap) */
+}
+/* Memastikan warna baris ganjil di Dark Mode juga benar */
+.dark :deep(.p-datatable-tbody .p-row-odd) {
+     background-color: var(--p-surface-900) !important; /* Striped Dark Row (Ganjil) */
+}
+
+/* HOVER ROW FIX */
+.dark :deep(.p-datatable-tbody > tr:hover) {
+    background-color: var(--p-surface-800) !important; 
+}
+:deep(.p-datatable-tbody > tr:hover) {
+    background-color: var(--p-surface-100) !important; 
+}
+
+/* Penyesuaian agar isi tabel rata atas */
 :deep(.p-datatable .p-datatable-tbody > tr > td) {
     vertical-align: top;
+    border-color: var(--p-surface-200); /* Border Light */
 }
+.dark :deep(.p-datatable .p-datatable-tbody > tr > td) {
+    border-color: var(--p-surface-800); /* Border Dark */
+}
+
+
 .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out;
 }

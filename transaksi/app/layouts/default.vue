@@ -1,3 +1,8 @@
+---
+
+### 💻 File `transaksi/app/layouts/default.vue`
+
+```vue
 <script setup>
 import { ref, computed, onMounted } from 'vue'; 
 import { useRouter, useRoute } from 'vue-router';
@@ -8,9 +13,10 @@ const route = useRoute();
 const authService = useAuthService();
 const authStore = useAuthStore();
 
+// Menggunakan computed untuk nama toko
 const storeName = computed(() => authStore.activeStore?.name || 'RetailApp');
 
-// --- [BARU] DARK MODE STATE & LOGIC ---
+// --- DARK MODE STATE & LOGIC ---
 const isDark = ref(false);
 
 const toggleDarkMode = () => {
@@ -27,6 +33,7 @@ onMounted(() => {
     if (process.client) {
         const theme = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // Tentukan tema awal: dari localStorage, atau default ke preferensi sistem (jika belum ada di local storage)
         isDark.value = (theme === 'dark' || (!theme && prefersDark));
         document.documentElement.classList.toggle('dark', isDark.value);
     }
@@ -50,9 +57,9 @@ const items = ref([
         ]
     },
     { 
-        label: 'Menu', 
-        icon: 'pi pi-list', 
-        key: 'menu',
+        label: 'Transaksi', 
+        icon: 'pi pi-wallet',
+        key: 'transaksi',
         items: [
             { 
                 label: 'Transaksi', 
@@ -62,17 +69,23 @@ const items = ref([
                     router.push('/transaction');
                 }
             },
-            { separator: true },
-            { 
-                label: 'Laporan', 
-                icon: 'pi pi-chart-bar', 
+        ]
+    },
+    { 
+        label: 'Laporan', 
+        icon: 'pi pi-chart-bar', 
+        key: 'report',
+        items: [
+             { 
+                label: 'Analisis', 
+                icon: 'pi pi-chart-line', 
                 route: '/report', 
                 command: (event) => {
                     router.push('/report');
                 }
             },
         ]
-    }
+    },
 ]);
 
 // --- PROFILE MENU ---
@@ -81,13 +94,14 @@ const profileItems = ref([
     { 
         label: 'Pengaturan', 
         icon: 'pi pi-cog', 
+        class: 'text-surface-700 dark:text-surface-200 hover:!bg-surface-50 dark:hover:!bg-surface-800',
         command: () => router.push('/setting')
     },
     { separator: true },
     { 
         label: 'Logout', 
         icon: 'pi pi-sign-out', 
-        class: 'text-red-600', 
+        class: 'text-red-600 hover:!bg-red-50/50 dark:hover:!bg-red-900/30 font-bold', 
         command: async () => await authService.logout()
     }
 ]);
@@ -113,6 +127,7 @@ const toggleDesktopSubMenu = (event, item) => {
         },
         separator: sub.separator 
     }));
+    // Menggunakan kelas dark:bg-surface-800 pada menu popup desktop
     desktopMenuRef.value.toggle(event);
 };
 
@@ -150,39 +165,52 @@ const isRouteActive = (item) => {
 </script>
 
 <template>
+    <!-- CONTAINER UTAMA: Menggunakan warna Surface yang adaptif -->
     <div class="min-h-screen flex flex-col bg-surface-50 dark:bg-surface-950 transition-colors duration-300">
         
-        <header class="sticky top-0 z-50 shadow-lg bg-primary-600 dark:bg-primary-900 border-b border-primary-700 px-2 md:px-4">
+        <!-- HEADER / NAVBAR -->
+        <!-- Menggunakan dark:bg-primary-950/90 untuk kesan lebih gelap dan elegan -->
+        <header class="sticky top-0 z-50 shadow-xl dark:shadow-black/50 bg-primary-600 dark:bg-primary-950/90 border-b border-primary-700 dark:border-primary-800 px-2 md:px-4 backdrop-blur-md bg-opacity-95">
             <div class="flex items-center h-16 w-full max-w-screen-2xl mx-auto">
                 
                 <NuxtLink to="/" class="flex items-center gap-3 group pl-2 shrink-0">
-                    <div class="w-9 h-9 bg-white text-primary-600 rounded-lg flex items-center justify-center font-black text-xl shadow-sm group-hover:scale-105 transition-transform">
+                    <!-- Logo Box: Kontras antara putih/primer dan latar header -->
+                    <div class="w-9 h-9 text-primary-600 rounded-lg flex items-center justify-center font-black text-xl shadow-md group-hover:scale-105 transition-transform">
                         R
                     </div>
                     <div class="flex flex-col">
-                        <span class="text-lg font-bold text-white tracking-tight leading-none group-hover:text-blue-100 transition-colors">
+                        <!-- Store Name: Teks putih di Light/Dark mode header -->
+                        <span class="text-lg font-bold text-white tracking-tight leading-none group-hover:text-primary-100 transition-colors">
                             {{ storeName }}
                         </span>
-                        <span class="text-[10px] text-blue-200 font-medium tracking-wide uppercase">
+                        <!-- POS System Tag: Warna light blue di Light/Dark mode header -->
+                        <span class="text-[10px] text-primary-200 font-medium tracking-wide uppercase">
                             POS System
                         </span>
                     </div>
                 </NuxtLink>
 
+                <!-- DESKTOP NAVIGATION ITEMS -->
                 <div class="hidden md:flex items-center gap-1 ml-8">
                     <template v-for="item in items" :key="item.label">
                         
+                        <!-- Item tanpa sub-menu (Dashboard) -->
                         <NuxtLink v-if="item.route && !item.items" :to="item.route" 
-                            class="px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-                            :class="route.path === item.route ? 'bg-white/20 text-white shadow-sm' : 'text-blue-100 hover:bg-white/10 hover:text-white'">
+                            class="px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                            :class="route.path === item.route 
+                                ? 'bg-white/20 text-white shadow-inner' 
+                                : 'text-primary-100 hover:bg-white/10 hover:text-white'">
                             <i :class="item.icon"></i>
                             <span>{{ item.label }}</span>
                         </NuxtLink>
 
+                        <!-- Item dengan sub-menu (Manajemen, Transaksi, Laporan) -->
                         <button v-else 
                             @click="(e) => toggleDesktopSubMenu(e, item)"
-                            class="px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 outline-none focus:ring-2 focus:ring-white/20"
-                            :class="isRouteActive(item) ? 'bg-white/20 text-white' : 'text-blue-100 hover:bg-white/10 hover:text-white'"
+                            class="px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 outline-none focus:ring-2 focus:ring-white/20"
+                            :class="isRouteActive(item) 
+                                ? 'bg-white/20 text-white shadow-inner' 
+                                : 'text-primary-100 hover:bg-white/10 hover:text-white'"
                             aria-haspopup="true">
                             <i :class="item.icon"></i>
                             <span>{{ item.label }}</span>
@@ -194,47 +222,59 @@ const isRouteActive = (item) => {
 
                 <div class="flex-1"></div>
 
+                <!-- ACTIONS (DARK MODE & PROFILE) -->
                 <div class="flex items-center gap-2 pr-2 shrink-0">
                     
+                    <!-- Dark Mode Toggle Button -->
                     <Button 
                         :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'" 
                         text 
                         rounded 
-                        :severity="isDark ? 'warning' : 'secondary'"
+                        severity="secondary"
                         class="!w-10 !h-10 text-white hover:bg-white/10" 
                         @click="toggleDarkMode" 
                         v-tooltip.bottom="'Toggle Dark Mode'" 
                     />
 
+                    <!-- Profile Avatar & Menu Trigger -->
                     <div class="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-white/10 rounded-full transition-colors"
                          @click="toggleProfile" aria-haspopup="true" aria-controls="profile_menu">
+                         <!-- Teks Username -->
                          <span class="hidden md:block text-sm text-white font-medium mr-1">Halo, {{ authStore.user?.username || 'Admin' }}</span>
-                         <Avatar :label="authStore.user?.username?.charAt(0).toUpperCase() || 'U'" class="!bg-white !text-primary-600 font-bold border-2 border-primary-400/50" shape="circle" />
-                         <i class="pi pi-chevron-down text-blue-100 text-xs hidden sm:block"></i>
+                         <!-- Avatar -->
+                         <Avatar :label="authStore.user?.username?.charAt(0).toUpperCase() || 'U'" class="!bg-white dark:!bg-surface-100 !text-primary-600 font-bold border-2 border-primary-400/50 dark:border-primary-700/50" shape="circle" />
+                         <i class="pi pi-chevron-down text-primary-100 text-xs hidden sm:block"></i>
                     </div>
                 </div>
 
             </div>
         </header>
 
+        <!-- MAIN CONTENT SLOT -->
+        <!-- Class pb-24 untuk memberi ruang bagi nav mobile -->
         <main class="flex-1 container mx-auto p-4 lg:p-6 max-w-screen-2xl w-full animate-fade-in pb-24 md:pb-6">
             <NuxtPage />
         </main>
 
-        <footer class="bg-white dark:bg-surface-900 border-t border-surface-200 dark:border-surface-800 py-6 mt-auto hidden md:block">
-            <div class="container mx-auto px-4 text-center text-sm text-surface-500">
-                &copy; 2025 {{ storeName }}. <span class="text-primary-600 font-bold">Powered by RetailApp</span>.
+        <!-- FOOTER (Desktop Only) -->
+        <footer class="border-t border-surface-200 dark:border-surface-800 py-6 mt-auto hidden md:block">
+            <div class="container mx-auto px-4 text-center text-sm text-surface-500 dark:text-surface-400">
+                &copy; 2025 {{ storeName }}. <span class="text-primary-600 dark:text-primary-400 font-bold">Powered by RetailApp</span>.
             </div>
         </footer>
 
-        <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-surface-900 border-t border-surface-200 dark:border-surface-800 z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <!-- MOBILE NAVIGATION (Fixed Bottom) -->
+        <nav class="md:hidden fixed bottom-0 left-0 right-0 border-t border-surface-200 dark:border-surface-800 z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] dark:shadow-black/50">
             <div class="flex justify-around items-center h-16">
                 <button v-for="item in items" :key="item.label"
                     @click="(event) => onMobileNavClick(event, item)"
                     class="flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-95"
-                    :class="isRouteActive(item) ? 'text-primary-600 dark:text-primary-400' : 'text-surface-500 dark:text-surface-400 hover:text-surface-900'">
+                    :class="isRouteActive(item) 
+                        ? 'text-primary-600 dark:text-primary-400' 
+                        : 'text-surface-500 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-200'">
                     <div class="relative px-3 py-1 rounded-full" :class="isRouteActive(item) ? 'bg-primary-50 dark:bg-primary-900/30' : ''">
                         <i :class="[item.icon, 'text-xl mb-0.5']"></i>
+                        <!-- Dot indikator jika menu punya sub-item dan sedang aktif -->
                         <div v-if="item.items && isRouteActive(item)" class="absolute -top-0 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-surface-900"></div>
                     </div>
                     <span class="text-[10px] font-medium">{{ item.label }}</span>
@@ -242,25 +282,18 @@ const isRouteActive = (item) => {
             </div>
         </nav>
 
+        <!-- MENU POPUPS (Pastikan mereka menggunakan style default dari PrimeVue yang sudah di-override di base.css) -->
         <Menu ref="profileMenu" id="profile_menu" :model="profileItems" :popup="true" class="mt-2 w-48" />
-        
         <Menu ref="desktopMenuRef" :model="desktopSubItems" :popup="true" class="mt-2 w-48" />
-
         <Menu ref="mobileMenuRef" :model="mobileSubItems" :popup="true" class="!w-48 !mb-2" />
 
     </div>
 </template>
 
 <style scoped>
+/* Padding bawah untuk menyesuaikan safe area di HP modern */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
 .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-/* Style konsisten untuk semua popup menu */
-:deep(.p-menu) {
-    border-radius: 0.75rem;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    border: 1px solid var(--surface-border);
-    z-index: 9999 !important;
-}
 </style>

@@ -241,7 +241,7 @@ defineExpose({ refreshData });
 
 <template>
     <div class="flex flex-col lg:flex-row h-full gap-4 p-4 overflow-hidden bg-surface-50 dark:bg-surface-950 font-sans">
-        <div class="flex-1 flex flex-col bg-white dark:bg-surface-900 rounded-2xl shadow border border-surface-200 dark:border-surface-800 h-full overflow-hidden">
+        <div class="flex-1 flex flex-col dark:bg-surface-900 rounded-2xl shadow border border-surface-200 dark:border-surface-800 h-full overflow-hidden">
             <div class="p-4 border-b border-surface-100 dark:border-surface-800 flex flex-col gap-3 bg-surface-50/30">
                 <div class="flex justify-between items-center">
                     <div class="flex items-center gap-2.5 text-orange-600 dark:text-orange-400">
@@ -285,7 +285,7 @@ defineExpose({ refreshData });
                             v-model="searchQuery" 
                             type="text"
                             placeholder="Cari nama produk atau scan barcode... (F2)" 
-                            class="w-full pl-9 pr-4 py-2.5 text-xs font-medium bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all shadow-sm h-[38px]"
+                            class="w-full pl-9 pr-4 py-2.5 text-xs font-medium dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition-all shadow-sm h-[38px]"
                             @keydown="onSearchKeydown" 
                             @input="handleSearch"
                             autocomplete="off"
@@ -304,10 +304,10 @@ defineExpose({ refreshData });
                         v-for="prod in filteredProducts" 
                         :key="prod.uuid"
                         @click="addToCart(prod)"
-                        class="group relative bg-white dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 p-3 cursor-pointer hover:border-orange-400 dark:hover:border-orange-600 hover:shadow-md transition-all duration-200 flex flex-col justify-between h-[110px] select-none"
+                        class="group relative dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 p-3 cursor-pointer hover:border-orange-400 dark:hover:border-orange-600 hover:shadow-md transition-all duration-200 flex flex-col justify-between h-[110px] select-none"
                     >
                         <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <i class="pi pi-plus-circle text-orange-500 text-lg bg-white rounded-full"></i>
+                            <i class="pi pi-plus-circle text-orange-500 text-lg rounded-full"></i>
                         </div>
 
                         <div class="flex flex-col h-full justify-between">
@@ -347,7 +347,7 @@ defineExpose({ refreshData });
             </div>
         </div>
 
-        <div class="w-[380px] flex flex-col bg-white dark:bg-surface-900 rounded-2xl shadow border border-surface-200 dark:border-surface-800 overflow-hidden shrink-0">
+        <div class="w-[380px] flex flex-col dark:bg-surface-900 rounded-2xl shadow border border-surface-200 dark:border-surface-800 overflow-hidden shrink-0">
             <div class="p-3 px-4 border-b border-surface-100 dark:border-surface-800 flex justify-between items-center bg-surface-50/50">
                 <div class="flex items-center gap-2">
                     <div class="w-7 h-7 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
@@ -375,9 +375,9 @@ defineExpose({ refreshData });
                 </div>
 
                 <div v-for="(item, index) in cart" :key="index + '_' + item.unitUuid" 
-                     class="bg-white dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 p-3 shadow-sm hover:border-orange-300 dark:hover:border-orange-700 transition-all group relative">
+                     class="dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 p-3 shadow-sm hover:border-orange-300 dark:hover:border-orange-700 transition-all group relative">
                     
-                    <button class="absolute -top-2 -right-2 w-6 h-6 bg-white dark:bg-surface-700 border border-surface-200 dark:border-surface-600 rounded-full shadow-sm flex items-center justify-center text-surface-400 hover:text-red-500 hover:border-red-200 transition-all opacity-0 group-hover:opacity-100 z-10 transform scale-90 group-hover:scale-100" 
+                    <button class="absolute -top-2 -right-2 w-6 h-6 dark:bg-surface-700 border border-surface-200 dark:border-surface-600 rounded-full shadow-sm flex items-center justify-center text-surface-400 hover:text-red-500 hover:border-red-200 transition-all opacity-0 group-hover:opacity-100 z-10 transform scale-90 group-hover:scale-100" 
                             @click="removeFromCart(index)">
                         <i class="pi pi-times text-[10px] font-bold"></i>
                     </button>
@@ -406,7 +406,7 @@ defineExpose({ refreshData });
                                 />
                             </div>
 
-                            <div class="flex items-center border border-surface-200 dark:border-surface-700 rounded-lg bg-white dark:bg-surface-900 h-8 px-2 focus-within:ring-1 focus-within:ring-orange-400 focus-within:border-orange-400 transition-all">
+                            <div class="flex items-center border border-surface-200 dark:border-surface-700 rounded-lg dark:bg-surface-900 h-8 px-2 focus-within:ring-1 focus-within:ring-orange-400 focus-within:border-orange-400 transition-all">
                                 <span class="text-[10px] font-bold text-surface-400 mr-1">@Rp</span>
                                 <InputNumber 
                                     v-model="item.buyPrice" 
@@ -420,12 +420,12 @@ defineExpose({ refreshData });
 
                         <div class="flex flex-col items-end justify-between h-full gap-2">
                             <div class="flex items-center bg-surface-100 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700 h-7 shadow-sm">
-                                <button class="w-7 h-full flex items-center justify-center text-surface-500 hover:bg-white hover:text-red-500 rounded-l-lg transition-colors" 
+                                <button class="w-7 h-full flex items-center justify-center text-surface-500 hover:hover:text-red-500 rounded-l-lg transition-colors" 
                                         @click="item.qty > 1 ? item.qty-- : removeFromCart(index)">
                                     <i class="pi pi-minus text-[9px] font-bold"></i>
                                 </button>
                                 <input v-model="item.qty" type="number" class="w-8 h-full bg-transparent text-center text-xs font-bold border-none outline-none appearance-none m-0 p-0 text-surface-800" min="1" />
-                                <button class="w-7 h-full flex items-center justify-center text-surface-500 hover:bg-white hover:text-primary-600 rounded-r-lg transition-colors" 
+                                <button class="w-7 h-full flex items-center justify-center text-surface-500 hover:hover:text-primary-600 rounded-r-lg transition-colors" 
                                         @click="item.qty++">
                                     <i class="pi pi-plus text-[9px] font-bold"></i>
                                 </button>
@@ -447,7 +447,7 @@ defineExpose({ refreshData });
             </div>
         </div>
 
-        <div class="w-[320px] flex flex-col bg-white dark:bg-surface-900 rounded-2xl shadow border border-surface-200 dark:border-surface-800 overflow-hidden shrink-0">
+        <div class="w-[320px] flex flex-col dark:bg-surface-900 rounded-2xl shadow border border-surface-200 dark:border-surface-800 overflow-hidden shrink-0">
              <div class="p-4 border-b border-surface-100 dark:border-surface-800 bg-surface-50/30">
                  <h2 class="font-bold text-sm text-surface-700 flex items-center gap-2">
                      <div class="w-6 h-6 rounded-md bg-orange-100 flex items-center justify-center">
@@ -463,7 +463,7 @@ defineExpose({ refreshData });
                      <div class="relative">
                         <i class="pi pi-building text-surface-400 text-xs absolute top-1/2 -translate-y-1/2 left-3"></i>
                         <InputText v-model="purchaseInfo.supplier" placeholder="Nama Supplier / Toko" 
-                            class="w-full !pl-9 !py-2.5 !text-xs !rounded-xl !bg-surface-50 focus:!bg-white transition-colors" />
+                            class="w-full !pl-9 !py-2.5 !text-xs !rounded-xl !bg-surface-50 focus:!transition-colors" />
                      </div>
                  </div>
 
@@ -472,14 +472,14 @@ defineExpose({ refreshData });
                      <div class="relative">
                         <i class="pi pi-hashtag text-surface-400 text-xs absolute top-1/2 -translate-y-1/2 left-3"></i>
                         <InputText v-model="purchaseInfo.referenceNo" placeholder="No. Faktur / Nota" 
-                            class="w-full !pl-9 !py-2.5 !text-xs !rounded-xl !bg-surface-50 focus:!bg-white transition-colors" />
+                            class="w-full !pl-9 !py-2.5 !text-xs !rounded-xl !bg-surface-50 focus:!transition-colors" />
                      </div>
                  </div>
 
                  <div class="space-y-1 flex-1 flex flex-col">
                      <label class="text-[10px] font-bold text-surface-400 uppercase tracking-wide ml-1">Catatan</label>
                      <Textarea v-model="purchaseInfo.notes" placeholder="Keterangan tambahan..." 
-                        class="w-full !text-xs !rounded-xl !bg-surface-50 focus:!bg-white transition-colors !p-3 resize-none flex-1 border-surface-200" />
+                        class="w-full !text-xs !rounded-xl !bg-surface-50 focus:!transition-colors !p-3 resize-none flex-1 border-surface-200" />
                  </div>
              </div>
 

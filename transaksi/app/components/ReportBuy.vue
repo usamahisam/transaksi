@@ -114,7 +114,7 @@ defineExpose({ refreshData });
     <div class="h-full flex flex-col bg-surface-50 dark:bg-surface-950">
         
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white dark:bg-surface-900 p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
+            <div class="p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
                     <i class="pi pi-wallet text-6xl text-orange-500"></i>
                 </div>
@@ -123,7 +123,7 @@ defineExpose({ refreshData });
                 <p class="text-xs text-green-600 mt-2 font-medium flex items-center"><i class="pi pi-arrow-up mr-1 text-[10px]"></i> Akumulasi Total</p>
             </div>
 
-            <div class="bg-white dark:bg-surface-900 p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
+            <div class="p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
                     <i class="pi pi-receipt text-6xl text-blue-500"></i>
                 </div>
@@ -132,7 +132,7 @@ defineExpose({ refreshData });
                 <p class="text-xs text-blue-500 mt-2 font-medium">Data termuat</p>
             </div>
 
-             <div class="bg-white dark:bg-surface-900 p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
+             <div class="p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
                     <i class="pi pi-chart-pie text-6xl text-purple-500"></i>
                 </div>
@@ -141,7 +141,7 @@ defineExpose({ refreshData });
                 <p class="text-xs text-surface-400 mt-2">Per Transaksi</p>
             </div>
 
-            <div class="bg-white dark:bg-surface-900 p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
+            <div class="p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
                     <i class="pi pi-users text-6xl text-emerald-500"></i>
                 </div>
@@ -151,7 +151,7 @@ defineExpose({ refreshData });
             </div>
         </div>
 
-        <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden flex-1">
+        <div class="rounded-2xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden flex-1">
             
             <div class="p-4 border-b border-surface-200 dark:border-surface-800 flex flex-col sm:flex-row justify-between gap-4 items-center bg-surface-50/50 dark:bg-surface-900">
                 <div class="w-full sm:w-auto">
@@ -291,3 +291,76 @@ defineExpose({ refreshData });
         </div>
     </div>
 </template>
+
+<style scoped>
+/* Mengatasi latar belakang tabel utama */
+:deep(.p-datatable) {
+    /* Menjadikan latar belakang transparent dan menghapus latar belakang PrimeVue */
+    background: transparent !important;
+    border-color: transparent !important;
+}
+
+/* Mengatasi latar belakang header */
+:deep(.p-datatable-thead > tr > th) {
+    background-color: var(--p-surface-50) !important; /* Light Mode default */
+    color: var(--p-text-color) !important;
+    border-color: var(--p-surface-200) !important;
+}
+
+/* Memaksa warna header di Dark Mode */
+.dark :deep(.p-datatable-thead > tr > th) {
+    background-color: var(--p-surface-900) !important;
+    color: var(--p-surface-100) !important;
+    border-color: var(--p-surface-800) !important;
+}
+
+/* Mengatasi latar belakang baris */
+:deep(.p-datatable-tbody > tr) {
+    background-color: var(--p-surface-0) !important; /* Light Mode default (putih) */
+    color: var(--p-text-color) !important;
+    border-color: var(--p-surface-200) !important;
+}
+
+/* Mengatasi warna baris ganjil/genap (striped rows) */
+:deep(.p-datatable-tbody .p-row-even) {
+    background-color: var(--p-surface-50) !important; /* Light Mode striped */
+}
+
+/* Memaksa warna baris di Dark Mode */
+.dark :deep(.p-datatable-tbody > tr) {
+    background-color: var(--p-surface-900) !important; /* Default Dark Row */
+}
+.dark :deep(.p-datatable-tbody .p-row-even) {
+    background-color: var(--p-surface-950) !important; /* Striped Dark Row (Genap) */
+}
+/* Memastikan warna baris ganjil di Dark Mode juga benar */
+.dark :deep(.p-datatable-tbody .p-row-odd) {
+     background-color: var(--p-surface-900) !important; /* Striped Dark Row (Ganjil) */
+}
+
+/* HOVER ROW FIX */
+.dark :deep(.p-datatable-tbody > tr:hover) {
+    background-color: var(--p-surface-800) !important; 
+}
+:deep(.p-datatable-tbody > tr:hover) {
+    background-color: var(--p-surface-100) !important; 
+}
+
+/* Penyesuaian agar isi tabel rata atas */
+:deep(.p-datatable .p-datatable-tbody > tr > td) {
+    vertical-align: top;
+    border-color: var(--p-surface-200); /* Border Light */
+}
+.dark :deep(.p-datatable .p-datatable-tbody > tr > td) {
+    border-color: var(--p-surface-800); /* Border Dark */
+}
+
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>

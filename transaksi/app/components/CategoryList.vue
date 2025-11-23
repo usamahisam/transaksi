@@ -156,7 +156,7 @@ defineExpose({ refresh: fetchCategories });
 
         <div v-else class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
             
-            <div @click="openCreateModal" class="bg-white dark:bg-surface-900 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 p-6 flex flex-col items-center justify-center text-center h-56 border-dashed border-2 cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors group">
+            <div @click="openCreateModal" class="rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 p-6 flex flex-col items-center justify-center text-center h-56 border-dashed border-2 cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors group">
                 <div class="w-12 h-12 rounded-full bg-surface-100 dark:bg-surface-800 group-hover:bg-primary-50 text-surface-400 group-hover:text-primary-500 flex items-center justify-center mb-3 transition-colors">
                     <i class="pi pi-plus text-xl"></i>
                 </div>
@@ -165,7 +165,7 @@ defineExpose({ refresh: fetchCategories });
 
             <div v-for="cat in categories" :key="cat.uuid" 
                 @click="openDetail(cat)"
-                class="bg-white dark:bg-surface-900 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden group hover:shadow-md hover:border-primary-300 transition-all relative cursor-pointer h-56 flex flex-col"
+                class="rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden group hover:shadow-md hover:border-primary-300 transition-all relative cursor-pointer h-56 flex flex-col"
             >
                 <div class="h-1.5 bg-gradient-to-r from-blue-400 to-blue-600 w-full"></div>
                 
