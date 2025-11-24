@@ -51,6 +51,66 @@ export class JournalController {
     return this.journalService.createBuy(body.details, body.userId, storeUuid);
   }
   
+  // [BARU] Endpoint untuk Retur Penjualan
+  @Post('return/sale')
+  @ApiOperation({ summary: 'Create sale return journal entry' })
+  async createSaleReturn(
+    @Body() body: any,
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    return this.journalService.createSaleReturn(body.details, body.userId, storeUuid);
+  }
+
+  // [BARU] Endpoint untuk Retur Pembelian
+  @Post('return/buy')
+  @ApiOperation({ summary: 'Create buy return journal entry' })
+  async createBuyReturn(
+    @Body() body: any,
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    return this.journalService.createBuyReturn(body.details, body.userId, storeUuid);
+  }
+  
+  // [BARU] Endpoint untuk Piutang Global (AR)
+  @Post('debt/ar')
+  @ApiOperation({ summary: 'Create accounts receivable (Piutang) global entry' })
+  async createAr(
+    @Body() body: any,
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    return this.journalService.createAr(body.details, body.userId, storeUuid);
+  }
+  
+  // [BARU] Endpoint untuk Hutang Global (AP)
+  @Post('debt/ap')
+  @ApiOperation({ summary: 'Create accounts payable (Hutang) global entry' })
+  async createAp(
+    @Body() body: any,
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    return this.journalService.createAp(body.details, body.userId, storeUuid);
+  }
+
+  // [BARU] Endpoint untuk Pembayaran Piutang
+  @Post('payment/ar')
+  @ApiOperation({ summary: 'Create accounts receivable payment journal entry' })
+  async createArPayment(
+    @Body() body: any,
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    return this.journalService.createArPayment(body.details, body.userId, storeUuid);
+  }
+  
+  // [BARU] Endpoint untuk Pembayaran Hutang
+  @Post('payment/ap')
+  @ApiOperation({ summary: 'Create accounts payable payment journal entry' })
+  async createApPayment(
+    @Body() body: any,
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    return this.journalService.createApPayment(body.details, body.userId, storeUuid);
+  }
+  
   @Get('report/:type')
   @ApiOperation({ summary: 'Get journal report by type (e.g., SALE)' })
   async getReport(

@@ -1,20 +1,31 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, BadRequestException, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { StoreService } from './store.service';
 import { InstallStoreDto } from './dto/install-store.dto';
 import { SaveSettingDto } from './dto/save-setting.dto'; // Import DTO baru
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AtGuard } from 'src/common/guards/at.guard';
 import { GetUser } from 'src/common/decorators/get-user.decorator';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Store')
-@Controller('store') // Base route: /store
+@Controller('store')
 export class StoreController {
   constructor(private readonly storeService: StoreService) {}
 
+  // [REVISI KRITIS] Endpoint Install diubah untuk menerima file dan body JSON
   @Post('install')
-  @ApiOperation({ summary: 'Install store and create admin user (Public)' })
-  async installStore(@Body() dto: InstallStoreDto) {
-    return this.storeService.installStore(dto);
+  @ApiConsumes('multipart/form-data') // Wajib untuk menerima file
+  @ApiOperation({ summary: 'Installs new store with optional logo upload' })
+  @UseInterceptors(FileInterceptor('logo')) // 'logo' adalah field name dari frontend
+  async install(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: InstallStoreDto,
+  ) {
+    let logoPath: string | null = null;
+    if (file) {
+      logoPath = `/uploads/${file.filename}`;
+    }
+    return this.storeService.installStore(body, logoPath, file?.originalname);
   }
 
   @Get('my-store')
@@ -38,5 +49,21 @@ export class StoreController {
     @Body() dto: SaveSettingDto
   ) {
     return this.storeService.saveSettings(userId, storeUuid, dto);
+  }
+
+  @Post('upload-logo')
+  @UseGuards(AtGuard)
+  @ApiConsumes('multipart/form-data') 
+  @ApiOperation({ summary: 'Uploads store logo and updates logo URL in settings' })
+  @UseInterceptors(FileInterceptor('file')) 
+  async uploadLogo(
+    @UploadedFile() file: Express.Multer.File, 
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded.');
+    }
+    const uploadedPath = `/uploads/${file.filename}`;
+    return this.storeService.updateStoreLogo(storeUuid, uploadedPath, file.originalname);
   }
 }

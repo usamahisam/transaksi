@@ -14,9 +14,19 @@ export const useStoreService = () => {
             body: payload
         });
     };
+    
+    const uploadStoreLogo = async (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return await useApi(`/store/upload-logo`, {
+            method: 'POST',
+            body: formData,
+        });
+    }
 
     return {
         getMyStore,
-        saveStoreSettings
+        saveStoreSettings,
+        uploadStoreLogo,
     };
 };

@@ -1,5 +1,5 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { InstallStoreDto } from './dto/install-store.dto';
 import { StoreEntity } from 'src/common/entities/store/store.entity';
@@ -21,11 +21,13 @@ const generateStoreSettingUuid = (storeUuid: string) => `${storeUuid}-STG-${gene
 @Injectable()
 export class StoreService {
   constructor(
+    @Inject('STORE_SETTING_REPOSITORY')
+    private settingRepository: Repository<StoreSettingEntity>,
     @Inject('DATA_SOURCE') private readonly dataSource: DataSource,
     private readonly authService: AuthService,
   ) { }
 
-  async installStore(dto: InstallStoreDto) {
+  async installStore(dto: InstallStoreDto, logoPath: string | null = null, originalName: string | null = null) {
     const customStoreUuid = generateStoreUuid();
     const customUserUuid = generateUserUuid(customStoreUuid);
 
@@ -80,6 +82,25 @@ export class StoreService {
         );
         await manager.save(settingEntities);
       }
+
+      const initialSettings: Partial<StoreSettingEntity>[] = [];
+    
+      if (logoPath) {
+          initialSettings.push(manager.create(StoreSettingEntity, {
+              uuid: generateStoreSettingUuid(customStoreUuid),
+              storeUuid: savedStore.uuid,
+              key: 'store_logo_url',
+              value: logoPath,
+          }));
+          initialSettings.push(manager.create(StoreSettingEntity, {
+              uuid: generateStoreSettingUuid(customStoreUuid),
+              storeUuid: savedStore.uuid,
+              key: 'store_logo_filename',
+              value: originalName ?? '',
+          }));
+      }
+
+      await manager.save(initialSettings);
 
       // 5. TOKEN (Bawa storeUuid)
       const tokens = await this.authService.getTokens(savedUser.uuid, savedUser.username, savedStore.uuid);
@@ -167,6 +188,7 @@ export class StoreService {
           } else {
             // CREATE new
             const newSetting = manager.create(StoreSettingEntity, {
+              uuid: generateStoreSettingUuid(storeUuid),
               storeUuid: storeUuid,
               key: item.key,
               value: item.value,
@@ -179,5 +201,43 @@ export class StoreService {
 
       return { message: 'Settings updated successfully' };
     });
+  }
+
+  async updateStoreLogo(storeUuid: string, logoUrl: string, originalName: string) {
+    const key = 'store_logo_url';
+    
+    const existingSetting = await this.settingRepository.findOne({
+      where: { storeUuid, key: key }
+    });
+
+    if (existingSetting) {
+      existingSetting.value = logoUrl;
+      await this.settingRepository.save(existingSetting);
+    } else {
+      const newSetting = this.settingRepository.create({
+        uuid: generateStoreSettingUuid(storeUuid),
+        storeUuid,
+        key: key,
+        value: logoUrl,
+      });
+      await this.settingRepository.save(newSetting);
+    }
+    
+    const existingFileName = await this.settingRepository.findOne({
+        where: { storeUuid, key: 'store_logo_filename' }
+    });
+    if (existingFileName) {
+        existingFileName.value = originalName;
+        await this.settingRepository.save(existingFileName);
+    } else {
+        await this.settingRepository.save(this.settingRepository.create({
+            uuid: generateStoreSettingUuid(storeUuid),
+            storeUuid,
+            key: 'store_logo_filename',
+            value: originalName,
+        }));
+    }
+
+    return { message: 'Logo updated successfully', logoUrl };
   }
 }

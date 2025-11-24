@@ -25,7 +25,9 @@ const selectedCategoryUuids = ref([]);
 const purchaseInfo = reactive({
     supplier: '',
     referenceNo: '',
-    notes: ''
+    notes: '',
+    paymentMethod: 'CASH', // [BARU] Metode pembayaran
+    dueDate: null, // [BARU] Tanggal jatuh tempo
 });
 
 // --- COMPUTED ---
@@ -36,8 +38,13 @@ const grandTotal = computed(() => {
     }, 0);
 });
 
+const isCreditBuy = computed(() => purchaseInfo.paymentMethod === 'CREDIT'); // [BARU] Check credit purchase
+
 const canCheckout = computed(() => {
-    return cart.value.length > 0 && grandTotal.value > 0;
+    return cart.value.length > 0 
+           && grandTotal.value > 0
+           // [UPDATE] Jika kredit, wajib ada due date
+           && (!isCreditBuy.value || !!purchaseInfo.dueDate);
 });
 
 const totalItems = computed(() => cart.value.reduce((a, b) => a + b.qty, 0));
@@ -185,7 +192,14 @@ const processPurchase = async () => {
                 supplier: purchaseInfo.supplier || 'Umum',
                 reference_no: purchaseInfo.referenceNo || '-',
                 notes: purchaseInfo.notes,
-                total_items_count: cart.value.length 
+                payment_method: purchaseInfo.paymentMethod, // [BARU]
+                total_items_count: cart.value.length,
+                
+                 // [UPDATE] Conditional fields untuk Kredit/Hutang
+                ...(isCreditBuy.value && { 
+                    is_credit: 'true', // Marker untuk backend JournalService
+                    due_date: purchaseInfo.dueDate
+                }),
             }
         };
 
@@ -199,12 +213,20 @@ const processPurchase = async () => {
 
         await journalService.createBuyTransaction(payload);
         
-        toast.add({ severity: 'success', summary: 'Stok Masuk', detail: 'Data pembelian berhasil disimpan', life: 5000 });
+        // Pesan Sukses disesuaikan
+        if (isCreditBuy.value) {
+            toast.add({ severity: 'info', summary: 'Hutang Dicatat', detail: `Pembelian kredit sebesar ${formatCurrency(grandTotal.value)} berhasil dicatat.`, life: 5000 });
+        } else {
+             toast.add({ severity: 'success', summary: 'Stok Masuk', detail: 'Data pembelian berhasil disimpan', life: 5000 });
+        }
         
+        // Reset state
         cart.value = [];
         purchaseInfo.supplier = '';
         purchaseInfo.referenceNo = '';
         purchaseInfo.notes = '';
+        purchaseInfo.paymentMethod = 'CASH';
+        purchaseInfo.dueDate = null;
         await loadProducts(); 
 
     } catch (e) {
@@ -399,7 +421,7 @@ defineExpose({ refreshData });
                                     optionValue="uuid" 
                                     class="custom-pill-dropdown !h-5 !border-none !bg-transparent !shadow-none min-w-[60px] !items-center"
                                     :pt="{ 
-                                        input: { class: '!p-0 !text-[11px] font-bold text-surface-700 dark:text-surface-200' }, 
+                                        input: { class: '!p-0 !text-[11px] font-bold text-surface-700 dark:!text-surface-200' }, 
                                         trigger: { class: '!w-4 text-surface-400' }
                                     }"
                                     @change="(e) => changeCartItemUnit(item, e.value)"
@@ -476,6 +498,22 @@ defineExpose({ refreshData });
                      </div>
                  </div>
 
+                <div class="space-y-1">
+                     <label class="text-[10px] font-bold text-surface-400 uppercase tracking-wide ml-1">Metode Bayar</label>
+                     <SelectButton v-model="purchaseInfo.paymentMethod" 
+                        :options="[{label: 'Cash/Transfer', value: 'CASH'}, {label: 'Kredit (Hutang)', value: 'CREDIT'}]"
+                        optionLabel="label" optionValue="value"
+                        class="w-full"
+                        :pt="{ button: { class: '!text-xs !py-2' } }"
+                    />
+                 </div>
+                 
+                 <div v-if="isCreditBuy" class="space-y-1">
+                     <label class="text-[10px] font-bold text-surface-400 uppercase tracking-wide ml-1">Jatuh Tempo <span class="text-red-400">*</span></label>
+                     <Calendar v-model="purchaseInfo.dueDate" dateFormat="dd/mm/yy" :minDate="new Date()" :manualInput="false" showIcon class="w-full" inputClass="!text-xs !py-2.5 !h-11" />
+                 </div>
+
+
                  <div class="space-y-1 flex-1 flex flex-col">
                      <label class="text-[10px] font-bold text-surface-400 uppercase tracking-wide ml-1">Catatan</label>
                      <Textarea v-model="purchaseInfo.notes" placeholder="Keterangan tambahan..." 
@@ -485,7 +523,7 @@ defineExpose({ refreshData });
 
              <div class="p-4 bg-surface-150 relative z-10">
                 <Button 
-                    label="SIMPAN STOK" 
+                    :label="isCreditBuy ? 'CATAT HUTANG' : 'SIMPAN STOK'" 
                     icon="pi pi-check-circle" 
                     iconPos="right"
                     class="w-full font-bold !py-3 !text-sm !bg-orange-500 hover:!bg-orange-600 !border-none !text-white shadow-lg shadow-orange-900/30 active:translate-y-0.5 transition-all !rounded-xl" 

@@ -10,8 +10,12 @@ const toast = useToast();
 // Pastikan composables/useInstallService.ts sudah dibuat
 const installService = useInstallService();
 
+// --- STATE ---
 const activeStep = ref(0);
 const loading = ref(false);
+
+const logoFile = ref(null);
+const logoPreviewUrl = ref(null); 
 
 const steps = ref([
     { label: 'Profil Toko', icon: 'pi pi-shopping-bag' },
@@ -32,6 +36,35 @@ const form = reactive({
 });
 
 // --- LOGIC ---
+
+// [BARU] Handler File Upload
+const handleFileSelect = (event) => {
+    const file = event.files ? event.files[0] : null;
+    
+    if (file && file.type.startsWith('image/')) {
+        logoFile.value = file;
+        
+        // Buat URL preview
+        if (logoPreviewUrl.value) {
+            URL.revokeObjectURL(logoPreviewUrl.value);
+        }
+        logoPreviewUrl.value = URL.createObjectURL(file);
+    } else {
+        logoFile.value = null;
+        logoPreviewUrl.value = null;
+        toast.add({ severity: 'warn', summary: 'Format Salah', detail: 'Hanya file gambar (JPG/PNG) yang diizinkan.', life: 3000 });
+    }
+    if (event.target) event.target.value = '';
+};
+
+const handleRemoveLogo = () => {
+    if (logoPreviewUrl.value) {
+        URL.revokeObjectURL(logoPreviewUrl.value);
+    }
+    logoFile.value = null;
+    logoPreviewUrl.value = null;
+};
+
 
 const nextStep = () => {
     // Step 0: Validasi Toko
@@ -64,23 +97,21 @@ const handleInstall = async () => {
         // Construct Payload GABUNGAN
         const payload = {
             // Data Toko
-            name: form.storeName,
+            storeName: form.storeName,
             address: form.storeAddress,
             phone: form.storePhone,
-            settings: [
-            ],
+            
+            // Data User
             username: form.username,
             password: form.password,
             email: form.email
         };
 
-        // Panggil SINGLE ENDPOINT
-        const response = await installService.installSystem(payload);
+        // Panggil SINGLE ENDPOINT (dengan file logo)
+        const response = await installService.installStore(payload, logoFile.value);
 
-        // Response: { store, user, tokens }
+        // Response: { tokens, store, user }
         // Simpan Token
-        // NOTE: Token disimpan agar proses instalasi tidak langsung diredirect oleh middleware,
-        // namun akan dihapus di fungsi goToLogin.
         const tokenCookie = useCookie('accessToken', { maxAge: 60 * 60 * 24 * 7, path: '/' });
         const refreshTokenCookie = useCookie('refreshToken', { maxAge: 60 * 60 * 24 * 7, path: '/' });
         tokenCookie.value = response.tokens.accessToken;
@@ -137,10 +168,42 @@ const goToLogin = () => {
                     <p class="text-sm text-surface-500 mb-6">Identitas toko untuk struk & laporan.</p>
 
                     <div class="flex flex-col gap-4">
+                        
+                        <!-- [BARU] UPLOAD LOGO -->
+                        <div class="field">
+                            <label class="font-semibold text-sm mb-1 block text-surface-700">Logo Toko (Opsional)</label>
+                            <div class="flex items-center gap-4 p-3 border border-surface-200 dark:border-surface-700 rounded-xl bg-surface-50 dark:bg-surface-800">
+                                
+                                <div class="relative shrink-0">
+                                    <img :src="logoPreviewUrl || 'https://placehold.co/70x70/FFFFFF/4c51bf?text=LOGO'" alt="Logo Preview" class="w-[70px] h-[70px] object-cover rounded-full border-4 border-white dark:border-surface-900 shadow-md" />
+                                    <Button v-if="logoFile" icon="pi pi-times" severity="danger" rounded text size="small" class="absolute top-0 right-0 !w-6 !h-6" @click="handleRemoveLogo" />
+                                </div>
+
+                                <FileUpload 
+                                    mode="basic" 
+                                    name="logo" 
+                                    accept="image/*" 
+                                    :maxFileSize="1000000" 
+                                    @select="handleFileSelect" 
+                                    customUpload 
+                                    chooseLabel="Pilih Gambar"
+                                    :auto="false"
+                                    class="!p-0 flex-1"
+                                >
+                                    <template #choosebutton="{ chooseCallback, label, icon }">
+                                        <Button :label="logoFile ? 'Ganti Logo' : label" :icon="icon" @click="chooseCallback" size="small" severity="secondary" class="w-full" />
+                                    </template>
+                                </FileUpload>
+                            </div>
+                        </div>
+
+                        <!-- Nama Toko -->
                         <div class="field">
                             <label class="font-semibold text-sm mb-1 block text-surface-700">Nama Toko <span class="text-red-500">*</span></label>
                             <InputText v-model="form.storeName" class="w-full" placeholder="Contoh: Toko Maju Jaya" autofocus />
                         </div>
+                        
+                        <!-- Alamat & Telepon -->
                         <div class="field">
                             <label class="font-semibold text-sm mb-1 block text-surface-700">Alamat</label>
                             <Textarea v-model="form.storeAddress" rows="2" class="w-full" placeholder="Alamat lengkap..." />
@@ -164,7 +227,7 @@ const goToLogin = () => {
                             <label class="font-semibold text-sm mb-1 block text-surface-700">Username <span class="text-red-500">*</span></label>
                             <InputText v-model="form.username" class="w-full" placeholder="admin" />
                         </div>
-                         <div class="field">
+                        <div class="field">
                             <label class="font-semibold text-sm mb-1 block text-surface-700">Email (Opsional)</label>
                             <InputText v-model="form.email" class="w-full" type="email" placeholder="admin@example.com" />
                         </div>

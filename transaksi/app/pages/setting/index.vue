@@ -2,16 +2,19 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
-import { useAuthStore } from '~/stores/auth.store'; 
+import { useAuthStore } from '~/stores/auth.store';
+import { useStoreService } from '~/composables/useStoreService'; // [BARU]
 
 const authStore = useAuthStore();
 const toast = useToast();
 const confirm = useConfirm();
+const storeService = useStoreService(); // [BARU]
 
 // --- STATE UI ---
 const activeTab = ref('general');
 const loading = ref(false);
 const initialLoading = ref(true);
+const logoLoading = ref(false); // [BARU] State untuk upload logo
 
 const menuItems = [
     { id: 'general', label: 'Identitas Toko', icon: 'pi pi-building', desc: 'Nama, alamat, dan kontak' },
@@ -26,10 +29,11 @@ const settings = reactive({
     store_phone: '',
     store_address: '',
     store_footer_msg: '',
-
+    store_logo_url: null, // [BARU] URL logo (tersimpan di DB settings)
+    
     // 2. Sales
     sale_tax_enabled: false,        
-    sale_tax_percentage: 0,        
+    sale_tax_percentage: 0,         
     sale_tax_method: 'exclusive',   
     sale_allow_negative_stock: false,
     sale_require_customer: false,
@@ -44,6 +48,23 @@ const settings = reactive({
     dev_auto_print_receipt: true,
     dev_show_logo_receipt: false
 });
+
+// [BARU] Computed untuk menampilkan URL Logo
+const currentLogoUrl = computed(() => {
+    // Ambil URL logo dari state lokal (yang sudah dimuat dari API)
+    const urlPath = settings.store_logo_url;
+    const fallback = 'https://placehold.co/150x150/e0f2f1/047857?text=Logo+Store';
+    
+    if (!urlPath) return fallback;
+
+    // Asumsi: Logo diakses melalui Base URL API
+    const config = useRuntimeConfig();
+    const baseUrl = config.public.apiBase.replace('/api', ''); // Sesuaikan base URL Anda
+    
+    // Jika URL sudah full, gunakan langsung. Jika tidak, gabungkan dengan base URL.
+    return urlPath.startsWith('http') ? urlPath : `${baseUrl}${urlPath}`;
+});
+
 
 // --- LOGIC MAPPER ---
 
@@ -64,6 +85,12 @@ const mapApiToState = (apiSettingsObj) => {
 };
 
 const updateSettingValue = (key, value) => {
+    // [FIX] Khusus untuk logo, simpan langsung
+    if (key === 'store_logo_url') {
+        settings.store_logo_url = value;
+        return;
+    }
+    
     if (settings.hasOwnProperty(key)) {
         const currentType = typeof settings[key];
         if (currentType === 'boolean') {
@@ -78,22 +105,23 @@ const updateSettingValue = (key, value) => {
 
 const mapStateToPayload = () => {
     const settingsArray = [];
-    // Field profil utama tidak masuk ke tabel settings
     const profileKeys = ['store_name', 'store_phone', 'store_address']; 
-
+    
+    // Semua properti settings yang bukan profile utama akan dikirim, termasuk store_logo_url
     for (const [key, value] of Object.entries(settings)) {
         if (profileKeys.includes(key)) continue;
 
         let formattedValue = value;
         if (typeof value === 'boolean') formattedValue = value ? 'true' : 'false';
         if (typeof value === 'number') formattedValue = String(value);
+        if (value === null || value === undefined) formattedValue = ''; // Kirim string kosong jika null/undefined
         
         settingsArray.push({ key, value: formattedValue });
     }
     return settingsArray;
 };
 
-// --- ACTIONS ---
+// --- FETCHING ---
 
 const fetchSettings = async () => {
     initialLoading.value = true;
@@ -109,6 +137,8 @@ const fetchSettings = async () => {
             
             // 2. Map Settings
             if (storeData.settings) {
+                // Reset store_logo_url sebelum mapping, untuk mencegah duplikasi
+                settings.store_logo_url = null; 
                 mapApiToState(storeData.settings);
             }
         }
@@ -120,9 +150,13 @@ const fetchSettings = async () => {
     }
 };
 
+// --- ACTIONS ---
+
 const saveSettings = async () => {
     loading.value = true;
     try {
+        // [FIX] Tambahkan store_footer_msg ke payload settings
+        
         const payload = {
             name: settings.store_name,
             phone: settings.store_phone,
@@ -130,8 +164,6 @@ const saveSettings = async () => {
             
             settings: mapStateToPayload() 
         };
-
-        console.log("Saving Payload:", payload);
 
         await authStore.saveStoreSettings(payload);
         
@@ -141,13 +173,68 @@ const saveSettings = async () => {
 
     } catch (e) {
         console.error(e);
-        // Tampilkan pesan error spesifik dari backend jika ada
         const msg = e.response?._data?.message || e.message || 'Terjadi kesalahan saat menyimpan.';
         toast.add({ severity: 'error', summary: 'Gagal', detail: msg });
     } finally {
         loading.value = false;
     }
 };
+
+// [BARU] Handler ketika file dipilih/di-drop
+const onLogoUpload = async (event) => {
+    const file = event.files ? event.files[0] : null;
+
+    if (!file) return;
+
+    logoLoading.value = true;
+    try {
+        const response = await storeService.uploadStoreLogo(file);
+        
+        // Cek response, jika ada logoUrl yang dikirim dari API, gunakan itu
+        if (response.logoUrl) {
+            settings.store_logo_url = response.logoUrl;
+        }
+        
+        // Muat ulang data toko untuk sinkronisasi state penuh (termasuk topbar)
+        await authStore.fetchUserStores();
+        
+        toast.add({ 
+            severity: 'success', 
+            summary: 'Upload Sukses', 
+            detail: `Logo berhasil diunggah dan disimpan!`, 
+            life: 3000 
+        });
+
+    } catch (e) {
+        console.error(e);
+        toast.add({ 
+            severity: 'error', 
+            summary: 'Gagal Upload', 
+            detail: e.message || 'Gagal mengunggah file. Pastikan formatnya benar.', 
+            life: 5000 
+        });
+    } finally {
+        logoLoading.value = false;
+        // Penting: Reset komponen FileUpload agar tidak menyimpan file lama di memori UI
+        event.target.value = ''; 
+    }
+};
+
+const onRemoveLogo = () => {
+     confirm.require({
+        message: 'Anda yakin ingin menghapus logo toko saat ini? Logo akan diganti dengan placeholder.',
+        header: 'Hapus Logo',
+        icon: 'pi pi-exclamation-triangle',
+        acceptClass: 'p-button-danger',
+        accept: () => {
+            // Menghapus URL dari state lokal
+            settings.store_logo_url = null;
+            // Langsung panggil saveSettings untuk menyimpan perubahan (menghapus URL dari DB)
+            saveSettings();
+        }
+    });
+};
+
 
 const handleReset = () => {
     confirm.require({
@@ -224,6 +311,45 @@ definePageMeta({ layout: 'default' });
                         
                         <!-- TAB: GENERAL -->
                         <div v-if="activeTab === 'general'" class="animate-fade-in space-y-6">
+                            
+                             <!-- Logo Upload Section -->
+                            <div class="card-section">
+                                <h3 class="section-title">Logo Toko</h3>
+                                <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                                    <div class="shrink-0 relative">
+                                        <img :src="currentLogoUrl" alt="Store Logo" class="w-24 h-24 object-cover rounded-full shadow-md border-4 border-surface-0 dark:border-surface-900" />
+                                        <div v-if="logoLoading" class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                                            <ProgressSpinner style="width: 30px; height: 30px" strokeWidth="6" animationDuration=".5s" class="text-white" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex flex-col items-center sm:items-start">
+                                        <p class="text-sm text-surface-600 dark:text-surface-400 mb-3">Unggah logo baru (Max 1MB, format: JPG/PNG). URL akan tersimpan di database.</p>
+
+                                        <div class="flex gap-2">
+                                            <FileUpload 
+                                                mode="basic" 
+                                                name="file" 
+                                                accept="image/*" 
+                                                :maxFileSize="1000000" 
+                                                @uploader="onLogoUpload" 
+                                                customUpload 
+                                                chooseLabel="Unggah Logo"
+                                                :auto="true"
+                                                :disabled="logoLoading || loading"
+                                                class="!p-0"
+                                            >
+                                                <template #choosebutton="{ chooseCallback, label, icon }">
+                                                    <Button :label="label" :icon="icon" @click="chooseCallback" size="small" :severity="logoLoading ? 'secondary' : 'primary'" :disabled="logoLoading || loading" />
+                                                </template>
+                                            </FileUpload>
+
+                                            <Button v-if="settings.store_logo_url" label="Hapus Logo" icon="pi pi-trash" severity="danger" size="small" @click="onRemoveLogo" :disabled="loading" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="card-section">
                                 <h3 class="section-title">Identitas Utama</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -239,15 +365,11 @@ definePageMeta({ layout: 'default' });
                                         <label>Alamat Lengkap</label>
                                         <Textarea v-model="settings.store_address" rows="3" class="w-full" />
                                     </div>
-                                </div>
-                            </div>
-
-                            <div class="card-section">
-                                <h3 class="section-title">Struk / Nota</h3>
-                                <div class="field">
-                                    <label>Pesan Kaki (Footer Note)</label>
-                                    <InputText v-model="settings.store_footer_msg" class="w-full" placeholder="Contoh: Terimakasih telah berbelanja!" />
-                                    <small class="text-surface-500">Teks ini akan muncul di bagian paling bawah struk belanja.</small>
+                                     <div class="field md:col-span-2">
+                                        <label>Pesan Kaki (Footer Note Struk)</label>
+                                        <InputText v-model="settings.store_footer_msg" class="w-full" placeholder="Contoh: Terimakasih telah berbelanja!" />
+                                        <small class="text-surface-500">Teks ini akan muncul di bagian paling bawah struk belanja.</small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -266,7 +388,7 @@ definePageMeta({ layout: 'default' });
                                 <div v-if="settings.sale_tax_enabled" class="bg-surface-50 dark:bg-surface-800 p-4 rounded-xl border border-surface-200 dark:border-surface-700 grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                                     <div class="field">
                                         <label>Persentase Pajak (%)</label>
-                                        <InputNumber v-model="settings.sale_tax_percentage" suffix="%" :min="0" :max="100" class="w-full" />
+                                        <InputNumber v-model="settings.sale_tax_percentage" suffix="%" :min="0" :max="100" showButtons class="w-full" />
                                     </div>
                                     <div class="field">
                                         <label>Metode Perhitungan</label>
@@ -330,7 +452,7 @@ definePageMeta({ layout: 'default' });
                             </div>
                         </div>
 
-                         <!-- TAB: DEVICE -->
+                        <!-- TAB: DEVICE -->
                         <div v-if="activeTab === 'device'" class="animate-fade-in space-y-6">
                             <div class="card-section">
                                 <h3 class="section-title">Pengaturan Printer Struk</h3>
@@ -351,11 +473,11 @@ definePageMeta({ layout: 'default' });
                                     <div class="field">
                                         <label>Opsi Cetak</label>
                                         <div class="flex flex-col gap-2 mt-1">
-                                             <div class="flex align-items-center">
+                                            <div class="flex align-items-center">
                                                 <Checkbox v-model="settings.dev_auto_print_receipt" binary inputId="autoprint" />
                                                 <label for="autoprint" class="ml-2 text-sm">Otomatis Print setelah bayar</label>
                                             </div>
-                                             <div class="flex align-items-center">
+                                            <div class="flex align-items-center">
                                                 <Checkbox v-model="settings.dev_show_logo_receipt" binary inputId="showlogo" />
                                                 <label for="showlogo" class="ml-2 text-sm">Tampilkan Logo Toko</label>
                                             </div>

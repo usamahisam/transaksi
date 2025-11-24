@@ -1,12 +1,9 @@
----
-
-### 💻 File `transaksi/app/layouts/default.vue`
-
-```vue
 <script setup>
 import { ref, computed, onMounted } from 'vue'; 
 import { useRouter, useRoute } from 'vue-router';
-import { useAuthStore } from '~/stores/auth.store'; 
+import { useAuthStore } from '~/stores/auth.store';
+// [BARU] Import useRuntimeConfig untuk mengkonstruksi URL logo
+const config = useRuntimeConfig();
 
 const router = useRouter();
 const route = useRoute(); 
@@ -15,6 +12,21 @@ const authStore = useAuthStore();
 
 // Menggunakan computed untuk nama toko
 const storeName = computed(() => authStore.activeStore?.name || 'RetailApp');
+
+// [BARU] Computed untuk menghasilkan URL Logo yang lengkap dan dapat diakses
+const currentLogoUrl = computed(() => {
+    // Ambil URL path dari settings (misal: /uploads/xxx.jpg)
+    const urlPath = authStore.getSetting('store_logo_url', null);
+    
+    // Jika tidak ada path, kembali ke null atau string kosong
+    if (!urlPath) return null;
+
+    // Konstruksi Base URL API (misal: http://localhost:3000)
+    const baseUrl = config.public.apiBase.replace('/api', ''); 
+
+    // Gabungkan Base URL dengan path
+    return urlPath.startsWith('http') ? urlPath : `${baseUrl}${urlPath}`;
+});
 
 // --- DARK MODE STATE & LOGIC ---
 const isDark = ref(false);
@@ -62,11 +74,19 @@ const items = ref([
         key: 'transaksi',
         items: [
             { 
-                label: 'Transaksi', 
+                label: 'Penjualan / Pembelian', 
                 icon: 'pi pi-wallet',
                 route: '/transaction', 
                 command: (event) => {
                     router.push('/transaction');
+                }
+            },
+            {
+                label: 'Piutang / Hutang', 
+                icon: 'pi pi-money-bill',
+                route: '/arap', 
+                command: (event) => {
+                    router.push('/arap');
                 }
             },
         ]
@@ -77,11 +97,11 @@ const items = ref([
         key: 'report',
         items: [
              { 
-                label: 'Analisis', 
+                label: 'Penjualan / Pembelian', 
                 icon: 'pi pi-chart-line', 
-                route: '/report', 
+                route: '/report/transaction',
                 command: (event) => {
-                    router.push('/report');
+                    router.push('/report/transaction');
                 }
             },
         ]
@@ -169,15 +189,23 @@ const isRouteActive = (item) => {
     <div class="min-h-screen flex flex-col bg-surface-50 dark:bg-surface-950 transition-colors duration-300">
         
         <!-- HEADER / NAVBAR -->
-        <!-- Menggunakan dark:bg-primary-950/90 untuk kesan lebih gelap dan elegan -->
         <header class="sticky top-0 z-50 shadow-xl dark:shadow-black/50 bg-primary-600 dark:bg-primary-950/90 border-b border-primary-700 dark:border-primary-800 px-2 md:px-4 backdrop-blur-md bg-opacity-95">
             <div class="flex items-center h-16 w-full max-w-screen-2xl mx-auto">
                 
                 <NuxtLink to="/" class="flex items-center gap-3 group pl-2 shrink-0">
-                    <!-- Logo Box: Kontras antara putih/primer dan latar header -->
-                    <div class="w-9 h-9 text-primary-600 rounded-lg flex items-center justify-center font-black text-xl shadow-md group-hover:scale-105 transition-transform">
-                        R
+                    <!-- LOGO DINAMIS -->
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center font-black text-xl shadow-md group-hover:scale-105 transition-transform overflow-hidden shrink-0">
+                        <img 
+                            v-if="currentLogoUrl" 
+                            :src="currentLogoUrl" 
+                            alt="Logo Toko" 
+                            class="w-full h-full object-cover" 
+                            onerror="this.onerror=null; this.src='https://placehold.co/90x90/FFFFFF/000000?text=R';"
+                        />
+                        <!-- Fallback jika tidak ada logo atau error -->
+                        <div v-else class="w-full h-full bg-white text-primary-600 flex items-center justify-center">R</div>
                     </div>
+
                     <div class="flex flex-col">
                         <!-- Store Name: Teks putih di Light/Dark mode header -->
                         <span class="text-lg font-bold text-white tracking-tight leading-none group-hover:text-primary-100 transition-colors">
@@ -238,12 +266,14 @@ const isRouteActive = (item) => {
 
                     <!-- Profile Avatar & Menu Trigger -->
                     <div class="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-white/10 rounded-full transition-colors"
-                         @click="toggleProfile" aria-haspopup="true" aria-controls="profile_menu">
-                         <!-- Teks Username -->
-                         <span class="hidden md:block text-sm text-white font-medium mr-1">Halo, {{ authStore.user?.username || 'Admin' }}</span>
-                         <!-- Avatar -->
-                         <Avatar :label="authStore.user?.username?.charAt(0).toUpperCase() || 'U'" class="!bg-white dark:!bg-surface-100 !text-primary-600 font-bold border-2 border-primary-400/50 dark:border-primary-700/50" shape="circle" />
-                         <i class="pi pi-chevron-down text-primary-100 text-xs hidden sm:block"></i>
+                        @click="toggleProfile" aria-haspopup="true" aria-controls="profile_menu">
+                        
+                        <!-- Teks Username -->
+                        <span class="hidden md:block text-sm text-white font-medium mr-1">Halo, {{ authStore.user?.username || 'Admin' }}</span>
+                        
+                        <!-- Avatar -->
+                        <Avatar :label="authStore.user?.username?.charAt(0).toUpperCase() || 'U'" class="!bg-white dark:!bg-surface-100 !text-primary-600 font-bold border-2 border-primary-400/50 dark:border-primary-700/50" shape="circle" />
+                        <i class="pi pi-chevron-down text-primary-100 text-xs hidden sm:block"></i>
                     </div>
                 </div>
 

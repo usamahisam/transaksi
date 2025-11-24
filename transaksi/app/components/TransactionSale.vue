@@ -25,7 +25,10 @@ const categories = ref([]);
 const selectedCategoryUuids = ref([]); 
 
 const payment = reactive({
+    method: 'CASH', // [BARU] Tambah metode pembayaran
     amount: null,
+    customerName: '', // [BARU] Nama pelanggan untuk piutang
+    dueDate: null, // [BARU] Tanggal jatuh tempo
 });
 
 // --- COMPUTED SETTINGS ---
@@ -46,8 +49,24 @@ const grandTotal = computed(() => {
     if (!taxEnabled.value) return cartSubtotal.value;
     return taxMethod.value === 'exclusive' ? cartSubtotal.value + taxAmount.value : cartSubtotal.value;
 });
-const changeAmount = computed(() => (payment.amount || 0) - grandTotal.value);
-const canCheckout = computed(() => cart.value.length > 0 && payment.amount >= grandTotal.value);
+
+const isCreditSale = computed(() => payment.method === 'CREDIT'); // [BARU] Check credit sale
+const amountPaid = computed(() => isCreditSale.value ? 0 : (payment.amount || 0)); // [UPDATE] Jika kredit, jumlah dibayar 0
+
+const changeAmount = computed(() => amountPaid.value - grandTotal.value);
+
+const canCheckout = computed(() => {
+    if (cart.value.length === 0) return false;
+    
+    // [UPDATE] Logika Checkout:
+    if (isCreditSale.value) {
+        // Jika Kredit: Hanya perlu GrandTotal > 0, Nama Pelanggan diisi, dan Tanggal Jatuh Tempo
+        return grandTotal.value > 0 && !!payment.customerName && !!payment.dueDate;
+    } else {
+        // Jika Cash/Non-Kredit: Perlu Uang Diterima >= Total
+        return amountPaid.value >= grandTotal.value;
+    }
+});
 
 // --- ACTIONS ---
 
@@ -184,9 +203,20 @@ const processCheckout = async () => {
         const payload = {
             amount: grandTotal.value,
             details: {
-                payment_method: 'CASH',
-                payment_received: payment.amount,
-                change: changeAmount.value,
+                payment_method: payment.method, // [UPDATE] Kirim payment.method
+                // [UPDATE] Conditional fields untuk Kredit/Cash
+                ...(isCreditSale.value ? {
+                    is_credit: 'true', // Marker untuk backend JournalService
+                    due_date: payment.dueDate,
+                    customer_name: payment.customerName,
+                    payment_received: 0, 
+                    change: 0,
+                } : {
+                    is_credit: 'false',
+                    payment_received: payment.amount,
+                    change: changeAmount.value,
+                }),
+                
                 total_items_count: cart.value.length,
                 subtotal_amount: cartSubtotal.value,
                 tax_amount: taxAmount.value,
@@ -202,10 +232,22 @@ const processCheckout = async () => {
             payload.details[`price#${index}`] = item.price;
             payload.details[`subtotal#${index}`] = item.qty * item.price;
         });
+        
         await journalService.createSaleTransaction(payload);
-        toast.add({ severity: 'success', summary: 'Transaksi Sukses', detail: 'Kembalian: ' + formatCurrency(changeAmount.value), life: 5000 });
+        
+        // Pesan Sukses disesuaikan
+        if (isCreditSale.value) {
+             toast.add({ severity: 'info', summary: 'Piutang Dicatat', detail: `Penjualan kredit ke ${payment.customerName} sebesar ${formatCurrency(grandTotal.value)}`, life: 5000 });
+        } else {
+             toast.add({ severity: 'success', summary: 'Transaksi Sukses', detail: 'Kembalian: ' + formatCurrency(changeAmount.value), life: 5000 });
+        }
+        
+        // Reset state
         cart.value = [];
         payment.amount = null;
+        payment.method = 'CASH'; // [UPDATE] Reset metode pembayaran
+        payment.customerName = ''; // [UPDATE] Reset field kredit
+        payment.dueDate = null; // [UPDATE] Reset field kredit
         await loadProducts(); 
     } catch (e) {
         console.error(e);
@@ -457,7 +499,7 @@ defineExpose({ refreshData });
         <div class="w-[320px] flex flex-col rounded-xl shadow-lg overflow-hidden shrink-0 relative">
              <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
              
-             <div class="p-4 flex-1 flex flex-col gap-5 relative z-10">
+             <div class="p-4 flex-1 flex flex-col gap-5 relative z-10 overflow-y-auto scrollbar-thin">
                 <div class="text-center pt-2">
                     <h3 class="text-surface-400 text-xs uppercase tracking-widest font-bold mb-1">Total Harus Dibayar</h3>
                     <div class="text-3xl font-black tracking-tight">
@@ -466,6 +508,18 @@ defineExpose({ refreshData });
                 </div>
 
                 <div class="bg-surface-800/50 p-3 rounded-xl border border-surface-700/50">
+                    <label class="text-[10px] text-surface-400 uppercase font-bold mb-2 block">Metode Pembayaran</label>
+                    <SelectButton 
+                        v-model="payment.method" 
+                        :options="[{label: 'Cash', value: 'CASH'}, {label: 'Kredit (Piutang)', value: 'CREDIT'}]"
+                        optionLabel="label"
+                        optionValue="value"
+                        class="w-full"
+                        :pt="{ button: { class: '!text-xs !py-2' } }"
+                    />
+                </div>
+
+                <div v-if="!isCreditSale" class="bg-surface-800/50 p-3 rounded-xl border border-surface-700/50">
                     <label class="text-[10px] text-surface-400 uppercase font-bold mb-2 block">Uang Diterima (Cash)</label>
                     <InputNumber v-model="payment.amount" mode="currency" currency="IDR" locale="id-ID" 
                         class="w-full" placeholder="0" :min="0" autofocus inputClass="!text-base !py-2.5 !px-3 !font-mono !rounded-lg !border-surface-700 focus:!border-primary-500 focus:!ring-1 !h-11" />
@@ -477,18 +531,32 @@ defineExpose({ refreshData });
                          <button class="py-1.5 bg-red-900/40 text-red-300 hover:bg-red-900/60 rounded text-[10px] font-bold transition-colors border border-red-900/50" @click="payment.amount = null">Clear</button>
                     </div>
                 </div>
+                
+                <div v-else class="bg-surface-800/50 p-3 rounded-xl border border-surface-700/50 space-y-4">
+                     <div class="space-y-1">
+                        <label class="text-[10px] text-surface-400 uppercase font-bold mb-2 block">Nama Pelanggan <span class="text-red-400">*</span></label>
+                        <InputText v-model="payment.customerName" placeholder="Nama Pelanggan" 
+                            class="w-full !py-2.5 !text-xs !rounded-lg !border-surface-700 focus:!border-primary-500 focus:!ring-1 !h-11" />
+                    </div>
+                     <div class="space-y-1">
+                        <label class="text-[10px] text-surface-400 uppercase font-bold mb-2 block">Jatuh Tempo <span class="text-red-400">*</span></label>
+                        <Calendar v-model="payment.dueDate" dateFormat="dd/mm/yy" :minDate="new Date()" :manualInput="false" showIcon class="w-full" inputClass="!text-xs !py-2.5 !h-11" />
+                    </div>
+                </div>
+
 
                 <div class="flex-1 flex flex-col justify-center items-center border-t border-surface-800 border-dashed pt-2">
-                    <span class="text-xs text-surface-400 mb-1">Kembalian</span>
+                    <span class="text-xs text-surface-400 mb-1">{{ isCreditSale ? 'Sisa Hutang' : 'Kembalian' }}</span>
                     <span class="text-2xl font-mono font-bold" :class="changeAmount < 0 ? 'text-red-400' : 'text-emerald-400'">
-                        {{ formatCurrency(Math.max(0, changeAmount)) }}
+                        {{ formatCurrency(isCreditSale ? grandTotal : Math.max(0, changeAmount)) }}
                     </span>
-                    <div v-if="changeAmount < 0" class="text-[10px] text-red-400 mt-1 bg-red-900/30 px-2 py-0.5 rounded">Kurang {{ formatCurrency(Math.abs(changeAmount)) }}</div>
+                    <div v-if="!isCreditSale && changeAmount < 0" class="text-[10px] text-red-400 mt-1 bg-red-900/30 px-2 py-0.5 rounded">Kurang {{ formatCurrency(Math.abs(changeAmount)) }}</div>
+                    <div v-else-if="isCreditSale && canCheckout" class="text-[10px] text-blue-400 mt-1 bg-blue-900/30 px-2 py-0.5 rounded">Piutang akan dicatat</div>
                 </div>
              </div>
 
              <div class="p-4 relative z-10">
-                <Button label="PROSES BAYAR" icon="pi pi-print" 
+                <Button :label="isCreditSale ? 'CATAT PIUTANG' : 'PROSES BAYAR'" icon="pi pi-print" 
                     class="w-full font-black !py-3 !text-sm !bg-emerald-500 hover:!bg-emerald-600 !border-none !text-white shadow-lg shadow-emerald-900/50 active:translate-y-0.5 transition-all" 
                     :disabled="!canCheckout" :loading="processing" @click="processCheckout" size="large" />
              </div>

@@ -6,11 +6,15 @@ import { StoreController } from './store.controller';
 import { StoreService } from './store.service';
 import { storeSettingProvider } from 'src/common/entities/store_setting/store_setting.provider';
 import { AuthModule } from '../auth/auth.module';
+import { MulterModule } from '@nestjs/platform-express';
 
 @Module({
   imports: [
     DatabaseModule,
-    AuthModule
+    AuthModule,
+    MulterModule.register({
+      dest: './uploads', 
+    }),
   ],
   controllers: [StoreController],
   providers: [

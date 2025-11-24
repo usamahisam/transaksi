@@ -75,11 +75,26 @@ export class JournalService {
       // 1. Simpan semua detail non-stock yang dikirim dari frontend
       await manager.save(detailEntities);
 
-      // 2. Proses Stock dan Nominal
-      if (type === 'SALE' || type === 'BUY') {
-        // Panggil fungsi pemroses stock dan nominal
-        await this.processStockAndNominal(details, userId, manager, code, type, storeUuid);
+      // 2. Proses Stock dan Nominal (SALE, BUY, RT_SALE, RT_BUY)
+      if (['SALE', 'BUY', 'RT_SALE', 'RT_BUY'].includes(type)) { 
+        await this.processStockAndNominal(details, userId, manager, code, type as any, storeUuid);
       }
+
+      // 3. Proses Debt/Credit (Piutang/Hutang saat SALE/BUY Kredit)
+      if (details.is_credit === 'true' && (type === 'SALE' || type === 'BUY')) {
+            await this.processCreditSaleAndBuyNominal(details, userId, manager, code, type as any, storeUuid);
+      }
+      
+      // [BARU] 4. Proses Pembuatan Piutang/Hutang Global (AR dan AP)
+      if (['AR', 'AP'].includes(type)) {
+          await this.processGlobalDebtNominal(details, userId, manager, code, type as any, storeUuid);
+      }
+      
+      // [BARU] 5. Proses Pembayaran Piutang/Hutang (PAY_AR dan PAY_AP)
+      if (['PAY_AR', 'PAY_AP'].includes(type)) {
+          await this.processPaymentNominal(details, userId, manager, code, type as any, storeUuid);
+      }
+
 
       return {
         message: `${type} journal created`,
@@ -89,16 +104,18 @@ export class JournalService {
     });
   }
 
+  // --- Processors ---
+  
   /**
-   * Mengkonversi item dari payload transaksi BUY/SALE menjadi entry Journal Detail
-   * untuk pencatatan stok dan nominal (stok_min_/stok_plus_ dan nominal_sale_/nominal_buy_).
+   * Mengkonversi item dari payload transaksi BUY/SALE/RETUR menjadi entry Journal Detail
+   * untuk pencatatan stok dan nominal.
    */
   private async processStockAndNominal(
     details: Record<string, any>,
     userId: string | undefined,
     manager: EntityManager,
     journalCode: string,
-    type: 'SALE' | 'BUY',
+    type: 'SALE' | 'BUY' | 'RT_SALE' | 'RT_BUY',
     storeUuid: string,
   ) {
     const itemsMap = new Map<string, any>();
@@ -109,9 +126,6 @@ export class JournalService {
       if (key.includes('#')) {
         const parts = key.split('#');
         const index = parts.pop();
-
-        // [PERBAIKAN] Menggunakan parts.join('#') untuk merekonstruksi nama field
-        // yang mungkin berisi underscore ('_') tanpa mengubahnya.
         const fieldName = parts.join('#');
 
         if (!index || isNaN(Number(index))) return;
@@ -122,28 +136,46 @@ export class JournalService {
         const itemObj = itemsMap.get(index);
 
         if (itemObj) {
-          // Mapping. FieldName yang dikirim frontend: product_uuid, unit_uuid, qty, price, subtotal
           if (fieldName === 'product_uuid') itemObj.productUuid = details[key];
           if (fieldName === 'unit_uuid') itemObj.unitUuid = details[key];
           if (fieldName === 'qty') itemObj.qty = Number(details[key]);
-
-          // Perhatikan: key price di sale adalah 'price', di buy adalah 'buy_price'
           if (fieldName === 'price' || fieldName === 'buy_price') itemObj.price = Number(details[key]);
           if (fieldName === 'subtotal') itemObj.subtotal = Number(details[key]);
         }
       }
     });
 
-    const stockPrefix = type === 'SALE' ? 'stok_min_' : 'stok_plus_';
-    const nominalPrefix = type === 'SALE' ? 'nominal_sale_' : 'nominal_buy_';
+    let stockPrefix: 'stok_min_' | 'stok_plus_';
+    let nominalPrefix: 'nominal_sale_' | 'nominal_buy_';
+
+    switch (type) {
+        case 'SALE':
+            stockPrefix = 'stok_min_'; 
+            nominalPrefix = 'nominal_sale_';
+            break;
+        case 'BUY':
+            stockPrefix = 'stok_plus_';
+            nominalPrefix = 'nominal_buy_';
+            break;
+        case 'RT_SALE': // Retur Penjualan (menambah stok)
+            stockPrefix = 'stok_plus_'; 
+            nominalPrefix = 'nominal_sale_'; 
+            break;
+        case 'RT_BUY': // Retur Pembelian (mengurangi stok)
+            stockPrefix = 'stok_min_'; 
+            nominalPrefix = 'nominal_buy_'; 
+            break;
+        default:
+            // This should not happen if called correctly
+            const _exhaustiveCheck: never = type;
+            throw new BadRequestException('Invalid journal type for stock operation');
+    }
 
     // 2. Buat Journal Detail Entries untuk Stok dan Nominal
     for (const [_, item] of itemsMap) {
-      // Pastikan data esensial ada
       if (item.productUuid && item.qty > 0 && item.unitUuid && item.price !== undefined) {
 
         // 2a. Catat Pergerakan Stok
-        // Key format: stok_(min/plus)_UUIDPRODUK_UUIDUNIT
         const stockKey = `${stockPrefix}${item.productUuid}_${item.unitUuid}`;
         journalDetails.push(manager.create(JournalDetailEntity, {
           uuid: generateJournalDetailUuid(storeUuid),
@@ -155,7 +187,6 @@ export class JournalService {
 
         // 2b. Catat Nominal
         const nominalKey = `${nominalPrefix}${item.productUuid}_${item.unitUuid}`;
-        // Gunakan subtotal jika ada, jika tidak, hitung (qty * price)
         const nominalValue = item.subtotal !== undefined ? item.subtotal : (item.qty * item.price);
 
         journalDetails.push(manager.create(JournalDetailEntity, {
@@ -172,6 +203,213 @@ export class JournalService {
       await manager.save(journalDetails);
     }
   }
+  
+  /**
+    * Mencatat nominal Piutang (nominal_ar) atau Hutang (nominal_ap) untuk transaksi SALE/BUY kredit.
+    */
+  private async processCreditSaleAndBuyNominal(
+        details: Record<string, any>,
+        userId: string | undefined,
+        manager: EntityManager,
+        journalCode: string,
+        type: 'SALE' | 'BUY',
+        storeUuid: string,
+    ) {
+        const grandTotal = Number(details['grand_total'] || 0);
+        if (grandTotal <= 0) return;
+
+        let debtKey: 'nominal_ar' | 'nominal_ap';
+        
+        // Piutang Penjualan (AR) terjadi saat SALE kredit.
+        if (type === 'SALE') {
+            debtKey = 'nominal_ar';
+        } 
+        // Hutang Pembelian (AP) terjadi saat BUY kredit.
+        else if (type === 'BUY') {
+            debtKey = 'nominal_ap';
+        } else {
+            return; 
+        }
+        
+        // Catat Piutang/Hutang sejumlah Grand Total
+        await manager.save(manager.create(JournalDetailEntity, {
+            uuid: generateJournalDetailUuid(storeUuid),
+            journalCode: journalCode,
+            key: debtKey,
+            value: String(grandTotal),
+            createdBy: userId,
+        }));
+        
+        // Simpan info tanggal jatuh tempo jika ada
+        if (details.due_date) {
+            await manager.save(manager.create(JournalDetailEntity, {
+                uuid: generateJournalDetailUuid(storeUuid),
+                journalCode: journalCode,
+                key: 'due_date',
+                value: String(details.due_date),
+                createdBy: userId,
+            }));
+        }
+        
+        // Simpan info Customer/Supplier jika belum ada di detail lain
+        if (type === 'SALE' && details.customer_name) {
+            await manager.save(manager.create(JournalDetailEntity, {
+                uuid: generateJournalDetailUuid(storeUuid),
+                journalCode: journalCode,
+                key: 'customer_name',
+                value: String(details.customer_name),
+                createdBy: userId,
+            }));
+        } else if (type === 'BUY' && details.supplier) {
+             await manager.save(manager.create(JournalDetailEntity, {
+                uuid: generateJournalDetailUuid(storeUuid),
+                journalCode: journalCode,
+                key: 'supplier',
+                value: String(details.supplier),
+                createdBy: userId,
+            }));
+        }
+    }
+    
+    /**
+      * [BARU] Mencatat nominal Piutang Global (nominal_ar_global) atau Hutang Global (nominal_ap_global).
+      */
+    private async processGlobalDebtNominal(
+        details: Record<string, any>,
+        userId: string | undefined,
+        manager: EntityManager,
+        journalCode: string,
+        type: 'AR' | 'AP',
+        storeUuid: string,
+    ) {
+        const amount = Number(details['amount'] || 0);
+        if (amount <= 0) return;
+
+        let debtKey: 'nominal_ar_global' | 'nominal_ap_global';
+        
+        if (type === 'AR') {
+            debtKey = 'nominal_ar_global';
+        } else if (type === 'AP') {
+            debtKey = 'nominal_ap_global';
+        } else {
+            return; 
+        }
+        
+        // Catat Piutang/Hutang Global sejumlah Amount
+        await manager.save(manager.create(JournalDetailEntity, {
+            uuid: generateJournalDetailUuid(storeUuid),
+            journalCode: journalCode,
+            key: debtKey,
+            value: String(amount),
+            createdBy: userId,
+        }));
+        
+        // Simpan info tanggal jatuh tempo jika ada
+        if (details.due_date) {
+            await manager.save(manager.create(JournalDetailEntity, {
+                uuid: generateJournalDetailUuid(storeUuid),
+                journalCode: journalCode,
+                key: 'due_date',
+                value: String(details.due_date),
+                createdBy: userId,
+            }));
+        }
+        
+        // Simpan info Customer/Supplier (contactName)
+        if (details.customer_name) {
+            await manager.save(manager.create(JournalDetailEntity, {
+                uuid: generateJournalDetailUuid(storeUuid),
+                journalCode: journalCode,
+                key: 'customer_name',
+                value: String(details.customer_name),
+                createdBy: userId,
+            }));
+        } else if (details.supplier) {
+             await manager.save(manager.create(JournalDetailEntity, {
+                uuid: generateJournalDetailUuid(storeUuid),
+                journalCode: journalCode,
+                key: 'supplier',
+                value: String(details.supplier),
+                createdBy: userId,
+            }));
+        }
+    }
+
+  /**
+    * Mencatat transaksi pembayaran Piutang (PAY_AR) atau Hutang (PAY_AP).
+    */
+    private async processPaymentNominal(
+        details: Record<string, any>,
+        userId: string | undefined,
+        manager: EntityManager,
+        journalCode: string,
+        type: 'PAY_AR' | 'PAY_AP',
+        storeUuid: string,
+    ) {
+        const amount = Number(details['amount'] || 0);
+        if (amount <= 0) return;
+
+        let debtKey: 'nominal_ar_paid' | 'nominal_ap_paid';
+        
+        if (type === 'PAY_AR') {
+            debtKey = 'nominal_ar_paid';
+        } else if (type === 'PAY_AP') {
+            debtKey = 'nominal_ap_paid';
+        } else {
+            return; 
+        }
+        
+        // Catat jumlah yang dibayarkan/diterima
+        await manager.save(manager.create(JournalDetailEntity, {
+            uuid: generateJournalDetailUuid(storeUuid),
+            journalCode: journalCode,
+            key: debtKey,
+            value: String(amount),
+            createdBy: userId,
+        }));
+        
+        // Catat referensi nota yang dibayar (Wajib)
+        if (!details.reference_journal_code) {
+             throw new BadRequestException('Reference journal code is required for payment transaction.');
+        }
+        await manager.save(manager.create(JournalDetailEntity, {
+            uuid: generateJournalDetailUuid(storeUuid),
+            journalCode: journalCode,
+            key: 'reference_journal_code',
+            value: String(details.reference_journal_code),
+            createdBy: userId,
+        }));
+        
+        // Catat nama Pelanggan/Supplier (jika ada)
+        if (details.customer_name) {
+            await manager.save(manager.create(JournalDetailEntity, {
+                uuid: generateJournalDetailUuid(storeUuid),
+                journalCode: journalCode,
+                key: 'customer_name',
+                value: String(details.customer_name),
+                createdBy: userId,
+            }));
+        } else if (details.supplier) {
+             await manager.save(manager.create(JournalDetailEntity, {
+                uuid: generateJournalDetailUuid(storeUuid),
+                journalCode: journalCode,
+                key: 'supplier',
+                value: String(details.supplier),
+                createdBy: userId,
+            }));
+        }
+        
+        // Simpan info metode pembayaran
+        if (details.payment_method) {
+             await manager.save(manager.create(JournalDetailEntity, {
+                uuid: generateJournalDetailUuid(storeUuid),
+                journalCode: journalCode,
+                key: 'payment_method',
+                value: String(details.payment_method),
+                createdBy: userId,
+            }));
+        }
+    }
 
 
   // ==========================================================
@@ -243,6 +481,37 @@ export class JournalService {
   async createBuy(details: any, userId: string, storeUuid: string) {
     return this.createJournal('BUY', details, userId, storeUuid);
   }
+  
+  // [BARU] Retur Penjualan
+  async createSaleReturn(details: any, userId: string, storeUuid: string) {
+    return this.createJournal('RT_SALE', details, userId, storeUuid);
+  }
+
+  // [BARU] Retur Pembelian
+  async createBuyReturn(details: any, userId: string, storeUuid: string) {
+    return this.createJournal('RT_BUY', details, userId, storeUuid);
+  }
+  
+  // [BARU] Piutang Global
+  async createAr(details: any, userId: string, storeUuid: string) {
+    return this.createJournal('AR', details, userId, storeUuid);
+  }
+  
+  // [BARU] Hutang Global
+  async createAp(details: any, userId: string, storeUuid: string) {
+    return this.createJournal('AP', details, userId, storeUuid);
+  }
+
+  // [BARU] Pembayaran Piutang
+  async createArPayment(details: any, userId: string, storeUuid: string) {
+    return this.createJournal('PAY_AR', details, userId, storeUuid);
+  }
+
+  // [BARU] Pembayaran Hutang
+  async createApPayment(details: any, userId: string, storeUuid: string) {
+    return this.createJournal('PAY_AP', details, userId, storeUuid);
+  }
+
 
   async findAllByType(typePrefix: string, storeUuid: string) {
     const codePattern = `${typePrefix}-${storeUuid}-%`;
@@ -264,12 +533,15 @@ export class JournalService {
     end.setHours(23, 59, 59, 999);
     const saleCodePattern = `SALE-${storeUuid}-%`;
     const buyCodePattern = `BUY-${storeUuid}-%`;
+    
+    // NOTE: Logika ini HARUS diupdate untuk menyertakan RT_SALE dan RT_BUY jika ingin grafik yang akurat
     const query = this.journalRepository.createQueryBuilder('j')
       .innerJoin('j.details', 'jd', 'jd.key = :key', { key: 'grand_total' })
       .where('j.createdAt BETWEEN :start AND :end', { start, end })
       .andWhere(`j.code LIKE :saleCodePattern OR j.code LIKE :buyCodePattern`, { saleCodePattern, buyCodePattern })
       .select([
-        "DATE_FORMAT(j.created_at, '%Y-%m-%d') as date",`SUM(CASE WHEN j.code LIKE :saleCodePattern THEN CAST(jd.value AS DECIMAL) ELSE 0 END) as total_sale`,
+        "DATE_FORMAT(j.created_at, '%Y-%m-%d') as date",
+        `SUM(CASE WHEN j.code LIKE :saleCodePattern THEN CAST(jd.value AS DECIMAL) ELSE 0 END) as total_sale`,
         `SUM(CASE WHEN j.code LIKE :buyCodePattern THEN CAST(jd.value AS DECIMAL) ELSE 0 END) as total_buy`
       ])
       .groupBy("date")

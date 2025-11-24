@@ -1,3 +1,5 @@
+// api-diengcyber/transaksi/transaksi-8c061ef45e91bf8e12e1b9338353de87878e544c/transaksi/app/components/ReportSale.vue
+
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useToast } from 'primevue/usetoast';
@@ -16,15 +18,21 @@ const filters = ref({
 
 // --- COMPUTED STATS ---
 const stats = computed(() => {
-    const totalOmset = transactions.value.reduce((sum, t) => sum + t.total, 0);
-    const totalTrx = transactions.value.length;
+    // Filter hanya transaksi SALE NON-RETURN untuk menghitung total omset kotor
+    const grossSales = transactions.value.filter(t => t.type === 'SALE');
+    const totalOmset = grossSales.reduce((sum, t) => sum + t.total, 0);
+    const totalTrx = transactions.value.length; 
     const average = totalTrx > 0 ? totalOmset / totalTrx : 0;
     
-    const totalItems = transactions.value.reduce((sum, t) => {
-        return sum + t.items.reduce((s, i) => s + i.qty, 0);
-    }, 0);
+    // Hitung Total Piutang (Piutang hanya dicatat saat SALE kredit)
+    const totalPiutang = transactions.value
+        .filter(t => t.isCredit && t.type === 'SALE')
+        .reduce((sum, t) => sum + t.total, 0);
 
-    return { totalOmset, totalTrx, average, totalItems };
+    // Hitung total nota retur
+    const totalReturnNotes = transactions.value.filter(t => t.isReturn).length;
+
+    return { totalOmset, totalTrx, average, totalReturnNotes, totalPiutang };
 });
 
 // --- LOAD DATA ---
@@ -37,32 +45,62 @@ const loadData = async () => {
             return acc;
         }, {});
 
-        const rawData = await journalService.getSalesReport();
+        // Fetch SALE dan RT_SALE lalu gabungkan
+        const [saleData, returnSaleData] = await Promise.all([
+             // Jika API gagal, gunakan try/catch individual atau default value:
+             journalService.getSalesReport().catch(e => { console.error("Error fetching SALE:", e); return []; }),
+             journalService.findAllByType('RT_SALE').catch(e => { console.error("Error fetching RT_SALE:", e); return []; }),
+        ]);
         
-        transactions.value = rawData.map(journal => {
+        // Pastikan kedua hasil adalah array sebelum digabung
+        const safeSaleData = Array.isArray(saleData) ? saleData : [];
+        const safeReturnData = Array.isArray(returnSaleData) ? returnSaleData : [];
+
+        const rawData = [
+            ...safeSaleData, 
+            ...safeReturnData
+        ];
+        
+        transactions.value = rawData
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) // Sort by date desc
+            .map(journal => {
             const detailsMap = Array.isArray(journal.details) 
                 ? journal.details.reduce((acc, curr) => { acc[curr.key] = curr.value; return acc; }, {}) 
                 : (journal.details || {});
 
+            const isReturn = journal.code.startsWith('RT_SALE'); // Cek dari code
+            const isCredit = detailsMap['is_credit'] === 'true'; // Cek dari detail
             const count = Number(detailsMap['total_items_count'] || 0);
             
             const items = [];
             for (let i = 0; i < count; i++) {
                 const pUuid = detailsMap[`product_uuid#${i}`];
+                // Menggunakan Math.abs untuk price/subtotal karena retur mengirim nilai negatif
+                const itemQty = Number(detailsMap[`qty#${i}`] || 0);
+                const itemPrice = Math.abs(Number(detailsMap[`price#${i}`] || 0)); 
+                const itemSubtotal = Math.abs(Number(detailsMap[`subtotal#${i}`] || 0));
+
                 items.push({
                     productName: productsMap.value[pUuid] || 'Unknown Product',
-                    qty: Number(detailsMap[`qty#${i}`] || 0),
-                    price: Number(detailsMap[`price#${i}`] || 0),
-                    subtotal: Number(detailsMap[`subtotal#${i}`] || 0),
+                    qty: itemQty,
+                    price: itemPrice,
+                    subtotal: itemSubtotal,
                 });
             }
 
+            const total = Number(detailsMap['grand_total'] || 0);
+
             return {
                 uuid: journal.uuid,
-                code: journal.code || journal.transactionNo || 'TRX-' + journal.uuid.substr(0,8).toUpperCase(),
+                code: journal.code || 'TRX-' + journal.uuid.substr(0,8).toUpperCase(),
+                type: isReturn ? 'RT_SALE' : 'SALE',
+                isReturn: isReturn,
+                isCredit: isCredit, 
                 date: journal.createdAt,
-                total: Number(detailsMap['grand_total'] || 0),
-                method: detailsMap['payment_method'] || 'CASH', 
+                total: total,
+                method: detailsMap['payment_method'] || (isCredit ? 'KREDIT' : 'CASH'),
+                customer: detailsMap['customer_name'] || '-', 
+                dueDate: detailsMap['due_date'] || null,
                 items: items 
             };
         });
@@ -70,6 +108,7 @@ const loadData = async () => {
     } catch (e) {
         console.error("Gagal memuat data", e);
         toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat data penjualan', life: 3000 });
+        transactions.value = [];
     } finally {
         loading.value = false;
     }
@@ -90,6 +129,7 @@ const formatDate = (dateString) => {
 const getMethodSeverity = (method) => {
     const m = (method || '').toUpperCase();
     if (m === 'CASH') return 'success';
+    if (m === 'KREDIT') return 'danger'; // Piutang/Kredit
     if (m.includes('QRIS')) return 'info';
     if (m.includes('TRANSFER')) return 'warning';
     return 'secondary';
@@ -114,9 +154,9 @@ defineExpose({ refreshData });
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
                     <i class="pi pi-money-bill text-6xl text-emerald-600"></i>
                 </div>
-                <p class="text-surface-500 text-xs font-bold uppercase tracking-wider mb-1">Total Omset</p>
+                <p class="text-surface-500 text-xs font-bold uppercase tracking-wider mb-1">Total Omset Kotor</p>
                 <h3 class="text-2xl font-black text-surface-800 dark:text-surface-100">{{ formatCurrency(stats.totalOmset) }}</h3>
-                <p class="text-xs text-emerald-600 mt-2 font-medium flex items-center"><i class="pi pi-arrow-up mr-1 text-[10px]"></i> Pendapatan Kotor</p>
+                <p class="text-xs text-emerald-600 mt-2 font-medium flex items-center"><i class="pi pi-arrow-up mr-1 text-[10px]"></i> Sebelum dikurangi retur</p>
             </div>
 
             <div class="p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
@@ -125,25 +165,25 @@ defineExpose({ refreshData });
                 </div>
                 <p class="text-surface-500 text-xs font-bold uppercase tracking-wider mb-1">Jumlah Transaksi</p>
                 <h3 class="text-2xl font-black text-surface-800 dark:text-surface-100">{{ stats.totalTrx }} <span class="text-base font-normal text-surface-400">Nota</span></h3>
-                <p class="text-xs text-blue-500 mt-2 font-medium">Pelanggan dilayani</p>
+                <p class="text-xs text-blue-500 mt-2 font-medium">Termasuk retur penjualan</p>
             </div>
 
             <div class="p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                    <i class="pi pi-chart-line text-6xl text-purple-500"></i>
+                    <i class="pi pi-file-excel text-6xl text-red-500"></i>
                 </div>
-                <p class="text-surface-500 text-xs font-bold uppercase tracking-wider mb-1">Rata-rata Transaksi</p>
-                <h3 class="text-2xl font-black text-surface-800 dark:text-surface-100">{{ formatCurrency(stats.average) }}</h3>
-                <p class="text-xs text-surface-400 mt-2">Per Nota / Pelanggan</p>
+                <p class="text-surface-500 text-xs font-bold uppercase tracking-wider mb-1">Total Retur Penjualan</p>
+                <h3 class="text-xl font-black text-surface-800 dark:text-surface-100">{{ stats.totalReturnNotes }} <span class="text-sm font-normal text-surface-400">Nota</span></h3>
+                <p class="text-xs text-red-500 mt-2 font-medium">Pengurangan Omset</p>
             </div>
 
              <div class="p-4 rounded-xl shadow-sm border border-surface-200 dark:border-surface-800 relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                    <i class="pi pi-box text-6xl text-orange-500"></i>
+                    <i class="pi pi-arrow-up-right text-6xl text-orange-500"></i>
                 </div>
-                <p class="text-surface-500 text-xs font-bold uppercase tracking-wider mb-1">Produk Terjual</p>
-                <h3 class="text-2xl font-black text-surface-800 dark:text-surface-100">{{ stats.totalItems }} <span class="text-base font-normal text-surface-400">Pcs</span></h3>
-                <p class="text-xs text-orange-500 mt-2 font-medium">Total Kuantitas</p>
+                <p class="text-surface-500 text-xs font-bold uppercase tracking-wider mb-1">Total Piutang</p>
+                <h3 class="text-2xl font-black text-surface-800 dark:text-surface-100">{{ formatCurrency(stats.totalPiutang) }}</h3>
+                <p class="text-xs text-orange-500 mt-2 font-medium">Penjualan Kredit Belum Lunas</p>
             </div>
         </div>
 
@@ -153,7 +193,7 @@ defineExpose({ refreshData });
                 <div class="w-full sm:w-auto">
                     <IconField iconPosition="left">
                         <InputIcon class="pi pi-search text-surface-400" />
-                        <InputText v-model="filters['global'].value" placeholder="Cari No. Transaksi..." class="w-full sm:w-80 !rounded-lg pl-10" />
+                        <InputText v-model="filters['global'].value" placeholder="Cari No. Transaksi, Pelanggan..." class="w-full sm:w-80 !rounded-lg pl-10" />
                     </IconField>
                 </div>
                 <div class="flex gap-2">
@@ -182,34 +222,49 @@ defineExpose({ refreshData });
 
                 <Column expander style="width: 3rem" />
 
-                <Column field="code" header="No. Transaksi" sortable>
+                <Column field="code" header="Info Transaksi" sortable>
                     <template #body="slotProps">
                         <div class="flex flex-col py-1">
-                            <span class="font-bold text-emerald-700 font-mono text-xs">{{ slotProps.data.code }}</span>
+                            <span class="font-bold font-mono text-xs"
+                                :class="slotProps.data.isReturn ? 'text-red-700' : 'text-emerald-700'"
+                            >
+                                {{ slotProps.data.code }}
+                            </span>
                             <div class="flex items-center gap-1 text-surface-500 text-[11px] mt-0.5">
                                 <i class="pi pi-clock text-[9px]"></i>
                                 <span>{{ formatDate(slotProps.data.date) }}</span>
                             </div>
+                            <Tag v-if="slotProps.data.isCredit" value="Piutang" severity="warning" rounded class="!text-[9px] mt-1 !font-extrabold !px-1.5 w-fit" />
                         </div>
                     </template>
                 </Column>
+                
+                <Column field="customer" header="Pelanggan" sortable>
+                     <template #body="slotProps">
+                        <span class="font-medium text-surface-700 dark:text-surface-200">{{ slotProps.data.customer || 'Umum' }}</span>
+                    </template>
+                </Column>
 
-                <Column field="method" header="Pembayaran" sortable>
+                <Column field="method" header="Pembayaran / Status" sortable>
                     <template #body="slotProps">
                         <Tag :value="slotProps.data.method" :severity="getMethodSeverity(slotProps.data.method)" rounded class="!text-[10px] !font-extrabold !px-2 uppercase" />
+                         <div v-if="slotProps.data.isCredit" class="text-[10px] text-surface-500 mt-1">J.Tempo: {{ slotProps.data.dueDate ? new Date(slotProps.data.dueDate).toLocaleDateString('id-ID') : '-' }}</div>
                     </template>
                 </Column>
 
                 <Column field="items.length" header="Item" sortable class="text-center">
                     <template #body="slotProps">
-                         <Badge :value="slotProps.data.items.length" severity="secondary" class="!min-w-[1.5rem] !h-[1.5rem]" />
+                         <Badge :value="slotProps.data.items.length" :severity="slotProps.data.isReturn ? 'danger' : 'secondary'" class="!min-w-[1.5rem] !h-[1.5rem]" />
                     </template>
                 </Column>
 
-                <Column field="total" header="Total Omset" sortable class="text-right">
+                <Column field="total" header="Total" sortable class="text-right">
                     <template #body="slotProps">
-                        <span class="font-black text-emerald-600 text-sm">
-                            {{ formatCurrency(slotProps.data.total) }}
+                        <span class="font-black text-sm"
+                           :class="slotProps.data.isReturn ? 'text-red-600' : 'text-emerald-600'"
+                        >
+                            {{ formatCurrency(Math.abs(slotProps.data.total)) }}
+                            <i v-if="slotProps.data.isReturn" class="pi pi-minus-circle text-[10px] ml-1"></i>
                         </span>
                     </template>
                 </Column>
@@ -224,7 +279,7 @@ defineExpose({ refreshData });
                     <div class="p-4 bg-emerald-50/50 dark:bg-surface-950/50 border-t border-b border-surface-200 dark:border-surface-800 shadow-inner">
                         <div class="flex items-center gap-2 mb-3 ml-1">
                             <i class="pi pi-shopping-cart text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 p-1.5 rounded-md"></i>
-                            <h5 class="font-bold text-surface-700 dark:text-surface-200 text-xs uppercase tracking-wide">Detail Keranjang Belanja</h5>
+                            <h5 class="font-bold text-surface-700 dark:text-surface-200 text-xs uppercase tracking-wide">Detail {{ slotProps.data.isReturn ? 'Pengembalian' : 'Penjualan' }}</h5>
                         </div>
                         
                         <div class="rounded-lg border border-surface-200 dark:border-surface-700 overflow-hidden bg-white dark:bg-surface-900">
@@ -246,7 +301,7 @@ defineExpose({ refreshData });
                                 </Column>
                                 <Column field="subtotal" header="Subtotal" class="text-right" style="width: 150px">
                                     <template #body="i">
-                                        <span class="font-bold text-surface-900 dark:text-surface-100">{{ formatCurrency(i.data.subtotal) }}</span>
+                                        <span class="font-bold text-surface-900 dark:text-surface-100">{{ formatCurrency(Math.abs(i.data.subtotal)) }}</span>
                                     </template>
                                 </Column>
                             </DataTable>
