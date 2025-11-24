@@ -1,7 +1,7 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
@@ -12,7 +12,7 @@ import { StoreEntity } from '../store/store.entity';
 
 @Entity('store_setting')
 export class StoreSettingEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn('varchar', { length: 60 })
   uuid: string;
 
   @Column({ length: 500 })

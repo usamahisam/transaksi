@@ -1,7 +1,6 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
@@ -9,13 +8,14 @@ import {
   JoinTable,
   ManyToOne,
   JoinColumn,
+  PrimaryColumn,
 } from 'typeorm';
 import { StoreEntity } from '../store/store.entity';
 import { UserRoleEntity } from '../user_role/user_role.entity';
 
 @Entity('user')
 export class UserEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn('varchar', { length: 60 })
   uuid: string;
 
   @Column({ length: 500, unique: true })

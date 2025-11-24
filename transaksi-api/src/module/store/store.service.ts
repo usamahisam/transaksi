@@ -9,6 +9,15 @@ import { AuthService } from 'src/module/auth/auth.service';
 import { SaveSettingDto } from './dto/save-setting.dto';
 import { UserRoleEntity, UserRole } from 'src/common/entities/user_role/user_role.entity';
 
+// [BARU] Helper untuk menghasilkan pengenal lokal
+const generateLocalUuid = () => Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+// [BARU] Helper untuk menghasilkan Store UUID (STR-[local_identifier])
+const generateStoreUuid = () => `STR-${generateLocalUuid()}`;
+// [BARU] Helper untuk menghasilkan User UUID (prefix dengan Store UUID)
+const generateUserUuid = (storeUuid: string) => `${storeUuid}-USR-${generateLocalUuid()}`;
+// [BARU] Helper untuk menghasilkan Store Setting UUID (prefix dengan Store UUID)
+const generateStoreSettingUuid = (storeUuid: string) => `${storeUuid}-STG-${generateLocalUuid()}`;
+
 @Injectable()
 export class StoreService {
   constructor(
@@ -17,6 +26,9 @@ export class StoreService {
   ) { }
 
   async installStore(dto: InstallStoreDto) {
+    const customStoreUuid = generateStoreUuid();
+    const customUserUuid = generateUserUuid(customStoreUuid);
+
     return await this.dataSource.transaction(async (manager) => {
       // 0. PREPARE ROLE ADMIN
       let adminUserRole = await manager.findOne(UserRoleEntity, {
@@ -32,6 +44,7 @@ export class StoreService {
       // 1. CREATE USER
       const hashedPassword = await bcrypt.hash(dto.password, 10);
       const newUser = manager.create(UserEntity, {
+        uuid: customUserUuid,
         username: dto.username,
         password: hashedPassword,
         email: dto.email,
@@ -41,6 +54,7 @@ export class StoreService {
 
       // 2. CREATE STORE
       const newStore = manager.create(StoreEntity, {
+        uuid: customStoreUuid,
         name: dto.name,
         address: dto.address,
         phone: dto.phone,
@@ -57,6 +71,7 @@ export class StoreService {
       if (dto.settings && dto.settings.length > 0) {
         const settingEntities = dto.settings.map((s) =>
           manager.create(StoreSettingEntity, {
+            uuid: generateStoreSettingUuid(customStoreUuid),
             storeUuid: savedStore.uuid,
             key: s.key,
             value: s.value,

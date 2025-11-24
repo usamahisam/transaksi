@@ -7,12 +7,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-    ],
+    origin: '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
   app.useGlobalPipes(new ValidationPipe());
@@ -23,9 +21,9 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('🛒 Transaksi API Documentation')
     .setDescription(`
-<b>Transaksi API — Retail Management System</b><br/>
-Dokumentasi interaktif untuk seluruh endpoint Master Data, Produk, Kategori, Transaksi, dan Laporan.<br/><br/>
-<b>Gunakan tombol "Authorize" di kanan atas untuk login JWT.</b>
+      <b>Transaksi API — Retail Management System</b><br/>
+      Dokumentasi interaktif untuk seluruh endpoint Master Data, Produk, Kategori, Transaksi, dan Laporan.<br/><br/>
+      <b>Gunakan tombol "Authorize" di kanan atas untuk login JWT.</b>
     `)
     .setVersion('2.0.0')
     .addBearerAuth(
@@ -50,9 +48,6 @@ Dokumentasi interaktif untuk seluruh endpoint Master Data, Produk, Kategori, Tra
 
   const document = SwaggerModule.createDocument(app, config);
 
-  // ============================
-  //     CUSTOM SWAGGER UI
-  // ============================
   SwaggerModule.setup('docs', app, document);
 
   await app.listen(process.env.PORT ?? 3000);

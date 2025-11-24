@@ -1,19 +1,19 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
   OneToMany,
   ManyToMany,
+  PrimaryColumn,
 } from 'typeorm';
 import { StoreSettingEntity } from '../store_setting/store_setting.entity';
 import { UserEntity } from '../user/user.entity';
 
 @Entity('store')
 export class StoreEntity {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn('varchar', { length: 60 })
   uuid: string;
 
   @Column({ length: 500 })

@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/co
 import { JournalService } from './journal.service';
 import { ApiOperation, ApiResponse, ApiBody, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AtGuard } from 'src/common/guards/at.guard';
+import { GetUser } from 'src/common/decorators/get-user.decorator';
 
 @ApiTags('Journal')
 @ApiBearerAuth()
@@ -23,8 +24,11 @@ export class JournalController {
     },
   })
   @ApiResponse({ status: 201, description: 'Sale journal created successfully' })
-  async createSale(@Body() body: any) {
-    return this.journalService.createSale(body.details, body.userId);
+  async createSale(
+    @Body() body: any,
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    return this.journalService.createSale(body.details, body.userId, storeUuid);
   }
 
   @Post('buy')
@@ -40,14 +44,20 @@ export class JournalController {
     },
   })
   @ApiResponse({ status: 201, description: 'Buy journal created successfully' })
-  async createBuy(@Body() body: any) {
-    return this.journalService.createBuy(body.details, body.userId);
+  async createBuy(
+    @Body() body: any,
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    return this.journalService.createBuy(body.details, body.userId, storeUuid);
   }
   
   @Get('report/:type')
   @ApiOperation({ summary: 'Get journal report by type (e.g., SALE)' })
-  async getReport(@Param('type') type: string) {
-    return this.journalService.findAllByType(type);
+  async getReport(
+    @Param('type') type: string,
+    @GetUser('storeUuid') storeUuid: string,
+  ) {
+    return this.journalService.findAllByType(type, storeUuid);
   }
 
   @Get('chart')
@@ -55,13 +65,14 @@ export class JournalController {
   async getChart(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @GetUser('storeUuid') storeUuid: string,
   ) {
     if (!startDate || !endDate) {
         const end = new Date();
         const start = new Date();
         start.setDate(start.getDate() - 7);
-        return this.journalService.getChartData(start.toISOString(), end.toISOString());
+        return this.journalService.getChartData(start.toISOString(), end.toISOString(), storeUuid);
     }
-    return this.journalService.getChartData(startDate, endDate);
+    return this.journalService.getChartData(startDate, endDate, storeUuid);
   }
 }

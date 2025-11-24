@@ -31,8 +31,9 @@ export class CategoryController {
   async create(
     @Body() body: CreateCategoryDto,
     @GetUser('sub') userId: string,
+    @GetUser('storeUuid') storeUuid: string, // <-- [UPDATED] Ambil storeUuid
   ) {
-    return this.categoryService.create(body, userId);
+    return this.categoryService.create(body, userId, storeUuid); // <-- [UPDATED] Teruskan storeUuid
   }
 
   // ================================
@@ -40,8 +41,10 @@ export class CategoryController {
   // ================================
   @Get('find-all')
   @ApiOperation({ summary: 'Get all categories' })
-  async findAll() {
-    return this.categoryService.findAll();
+  async findAll(
+    @GetUser('storeUuid') storeUuid: string, // <-- [UPDATED] Ambil storeUuid
+  ) {
+    return this.categoryService.findAll(storeUuid); // <-- [UPDATED] Teruskan storeUuid
   }
 
   // ================================
@@ -49,8 +52,11 @@ export class CategoryController {
   // ================================
   @Get(':uuid')
   @ApiOperation({ summary: 'Get category detail by UUID' })
-  async findOne(@Param('uuid', new ParseUUIDPipe()) uuid: string) {
-    return this.categoryService.findOne(uuid);
+  async findOne(
+    @Param('uuid') uuid: string,
+    @GetUser('storeUuid') storeUuid: string, 
+  ) {
+    return this.categoryService.findOne(uuid, storeUuid);
   }
 
   // ================================
@@ -59,11 +65,12 @@ export class CategoryController {
   @Put('update/:uuid')
   @ApiOperation({ summary: 'Update category data (support parentUuid)' })
   async update(
-    @Param('uuid', new ParseUUIDPipe()) uuid: string,
+    @Param('uuid') uuid: string,
     @Body() body: UpdateCategoryDto,
     @GetUser('sub') userId: string,
+    @GetUser('storeUuid') storeUuid: string, 
   ) {
-    return this.categoryService.update(uuid, body, userId);
+    return this.categoryService.update(uuid, body, userId, storeUuid);
   }
 
   // ================================
@@ -72,10 +79,11 @@ export class CategoryController {
   @Delete('delete/:uuid')
   @ApiOperation({ summary: 'Soft delete category' })
   async remove(
-    @Param('uuid', new ParseUUIDPipe()) uuid: string,
+    @Param('uuid') uuid: string,
     @GetUser('sub') userId: string,
+    @GetUser('storeUuid') storeUuid: string, // <-- [UPDATED] Ambil storeUuid
   ) {
-    return this.categoryService.remove(uuid, userId);
+    return this.categoryService.remove(uuid, userId, storeUuid); // <-- [UPDATED] Teruskan storeUuid
   }
 
   // ================================
@@ -83,7 +91,7 @@ export class CategoryController {
   // ================================
   @Post('restore/:uuid')
   @ApiOperation({ summary: 'Restore a soft-deleted category' })
-  async restore(@Param('uuid', new ParseUUIDPipe()) uuid: string) {
+  async restore(@Param('uuid') uuid: string) {
     return this.categoryService.restore(uuid);
   }
 }

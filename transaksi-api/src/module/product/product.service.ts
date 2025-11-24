@@ -152,7 +152,7 @@ export class ProductService {
             oldQty: 0
           }
         });
-        await this.journalService.processStockAdjustment(mappedAdjustments, userId, manager);
+        await this.journalService.processStockAdjustment(mappedAdjustments, userId, manager, storeUuid);
       }
 
       // 5. Process Shelves
@@ -189,7 +189,7 @@ export class ProductService {
   // ==========================================================
   // UPDATE PRODUCT (Stok Penyesuaian ke Journal)
   // ==========================================================
-  async update(uuid: string, payload: any, userId: string, storeUuid?: string) {
+  async update(uuid: string, payload: any, userId: string, storeUuid: string) {
     const { name, units, prices, stocks, stockAdjustments, categoryUuids } = payload;
 
     return await this.dataSource.transaction(async (manager) => {
@@ -286,7 +286,7 @@ export class ProductService {
             unitUuid: realUnitUuid,
           }
         });
-        await this.journalService.processStockAdjustment(mappedAdjustments, userId, manager);
+        await this.journalService.processStockAdjustment(mappedAdjustments, userId, manager, storeUuid);
       }
 
       // 5. Sinkronisasi Rak (Shelves Allocation)

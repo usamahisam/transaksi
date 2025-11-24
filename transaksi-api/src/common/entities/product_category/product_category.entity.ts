@@ -1,7 +1,7 @@
 import {
     Entity,
     Column,
-    PrimaryGeneratedColumn,
+    PrimaryColumn,
     CreateDateColumn,
     UpdateDateColumn,
     DeleteDateColumn,
@@ -12,7 +12,7 @@ import { ProductCategoryPivotEntity } from '../product_category_pivot/product_ca
 
 @Entity('product_category')
 export class ProductCategoryEntity {
-    @PrimaryGeneratedColumn('uuid')
+    @PrimaryColumn('varchar', { length: 60 })
     uuid: string;
 
     @Column({ length: 500 })

@@ -1,8 +1,11 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException } from '@nestjs/common';
 import { Repository, DataSource, EntityManager, Like } from 'typeorm';
 import { JournalEntity } from 'src/common/entities/journal/journal.entity';
 import { JournalDetailEntity } from 'src/common/entities/journal_detail/journal_detail.entity';
-// import { ProductService } from '../product/product.service'; // DIHAPUS: ProductService tidak lagi mengelola ProductStock
+
+// [BARU] Helper untuk menghasilkan pengenal lokal
+const generateLocalUuid = () => Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+const generateJournalDetailUuid = (storeUuid: string) => `${storeUuid}-JDT-${generateLocalUuid()}`;
 
 @Injectable()
 export class JournalService {
@@ -17,21 +20,43 @@ export class JournalService {
     private dataSource: DataSource,
   ) { }
 
-  async generateCode(prefix: string) {
+  async generateCode(prefix: string, storeUuid: string) {
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    // NOTE: Ini masih menggunakan COUNT global, idealnya harus diubah ke SEQUENCE atau MAX(code)
-    const count = await this.journalRepository.count();
-    return `${prefix}-${date}-${String(count + 1).padStart(4, '0')}`;
+    const codePrefix = `${prefix}-${storeUuid}-${date}-`;
+    
+    // Logika untuk mencari urutan tertinggi di toko yang sama
+    const maxCodeJournal = await this.journalRepository.findOne({
+        where: { code: Like(`${codePrefix}%`) },
+        order: { code: 'DESC' },
+    });
+
+    let sequence = 1;
+    if (maxCodeJournal) {
+        const lastPart = maxCodeJournal.code.split('-').pop();
+        if (lastPart) {
+            sequence = parseInt(lastPart) + 1;
+        }
+    }
+    return `${codePrefix}${String(sequence).padStart(4, '0')}`;
   }
 
   async createJournal(
     type: string,
     details: Record<string, any>,
     userId: string,
+    storeUuid: string,
   ) {
+    
+    if (!storeUuid) {
+        throw new BadRequestException('Store ID is required for journal creation.');
+    }
+    
+    const customJournalUuid = `${storeUuid}-JRN-${generateLocalUuid()}`;
+
     return this.dataSource.transaction(async (manager) => {
-      const code = await this.generateCode(type);
+      const code = await this.generateCode(type, storeUuid);
       const journal = manager.create(JournalEntity, {
+        uuid: customJournalUuid,
         code,
         createdBy: userId,
       });
@@ -39,6 +64,7 @@ export class JournalService {
 
       const detailEntities = Object.entries(details).map(([key, value]) =>
         manager.create(JournalDetailEntity, {
+          uuid: generateJournalDetailUuid(storeUuid),
           key,
           value: typeof value === 'object' ? JSON.stringify(value) : String(value),
           journalCode: code,
@@ -52,7 +78,7 @@ export class JournalService {
       // 2. Proses Stock dan Nominal
       if (type === 'SALE' || type === 'BUY') {
         // Panggil fungsi pemroses stock dan nominal
-        await this.processStockAndNominal(details, userId, manager, code, type);
+        await this.processStockAndNominal(details, userId, manager, code, type, storeUuid);
       }
 
       return {
@@ -72,7 +98,8 @@ export class JournalService {
     userId: string | undefined,
     manager: EntityManager,
     journalCode: string,
-    type: 'SALE' | 'BUY'
+    type: 'SALE' | 'BUY',
+    storeUuid: string,
   ) {
     const itemsMap = new Map<string, any>();
     const journalDetails: Partial<JournalDetailEntity>[] = [];
@@ -119,6 +146,7 @@ export class JournalService {
         // Key format: stok_(min/plus)_UUIDPRODUK_UUIDUNIT
         const stockKey = `${stockPrefix}${item.productUuid}_${item.unitUuid}`;
         journalDetails.push(manager.create(JournalDetailEntity, {
+          uuid: generateJournalDetailUuid(storeUuid),
           journalCode: journalCode,
           key: stockKey,
           value: String(item.qty),
@@ -131,6 +159,7 @@ export class JournalService {
         const nominalValue = item.subtotal !== undefined ? item.subtotal : (item.qty * item.price);
 
         journalDetails.push(manager.create(JournalDetailEntity, {
+          uuid: generateJournalDetailUuid(storeUuid),
           journalCode: journalCode,
           key: nominalKey,
           value: String(nominalValue),
@@ -155,14 +184,17 @@ export class JournalService {
     adjustments: Array<{ productUuid: string; unitUuid: string; oldQty: number; newQty: number; }>,
     userId: string | undefined,
     manager: EntityManager,
+    storeUuid: string,
   ) {
     if (!adjustments || adjustments.length === 0) return;
 
     const journalDetails: Partial<JournalDetailEntity>[] = [];
-    const code = await this.generateCode('ADJ');
+    const code = await this.generateCode('ADJ', storeUuid);
+    const customJournalUuid = `${storeUuid}-JRN-${generateLocalUuid()}`;
 
     // 1. Buat Journal entry untuk adjustment
     const journal = manager.create(JournalEntity, {
+      uuid: customJournalUuid,
       code,
       createdBy: userId,
     });
@@ -181,6 +213,7 @@ export class JournalService {
       const stockKey = `${stockPrefix}${adj.productUuid}_${adj.unitUuid}`;
 
       journalDetails.push(manager.create(JournalDetailEntity, {
+        uuid: generateJournalDetailUuid(storeUuid),
         journalCode: code,
         key: stockKey,
         value: String(qty),
@@ -190,6 +223,7 @@ export class JournalService {
       // Catat juga metadata adjustment untuk audit/laporan
       const metaKey = `stok_adj_meta_${adj.productUuid}_${adj.unitUuid}`;
       journalDetails.push(manager.create(JournalDetailEntity, {
+        uuid: generateJournalDetailUuid(storeUuid),
         journalCode: code,
         key: metaKey,
         value: JSON.stringify({ diff: diff, old: adj.oldQty, new: adj.newQty }),
@@ -202,18 +236,19 @@ export class JournalService {
     }
   }
 
-  async createSale(details: any, userId: string) {
-    return this.createJournal('SALE', details, userId);
+  async createSale(details: any, userId: string, storeUuid: string) {
+    return this.createJournal('SALE', details, userId, storeUuid);
   }
 
-  async createBuy(details: any, userId: string) {
-    return this.createJournal('BUY', details, userId);
+  async createBuy(details: any, userId: string, storeUuid: string) {
+    return this.createJournal('BUY', details, userId, storeUuid);
   }
 
-  async findAllByType(typePrefix: string) {
+  async findAllByType(typePrefix: string, storeUuid: string) {
+    const codePattern = `${typePrefix}-${storeUuid}-%`;
     return await this.journalRepository.find({
       where: {
-        code: Like(`${typePrefix}%`),
+        code: Like(`${codePattern}%`),
       },
       relations: ['details'],
       order: {
@@ -222,18 +257,20 @@ export class JournalService {
     });
   }
 
-  async getChartData(startDate: string, endDate: string) {
+  async getChartData(startDate: string, endDate: string, storeUuid: string) {
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
+    const saleCodePattern = `SALE-${storeUuid}-%`;
+    const buyCodePattern = `BUY-${storeUuid}-%`;
     const query = this.journalRepository.createQueryBuilder('j')
       .innerJoin('j.details', 'jd', 'jd.key = :key', { key: 'grand_total' })
       .where('j.createdAt BETWEEN :start AND :end', { start, end })
+      .andWhere(`j.code LIKE :saleCodePattern OR j.code LIKE :buyCodePattern`, { saleCodePattern, buyCodePattern })
       .select([
-        "DATE_FORMAT(j.created_at, '%Y-%m-%d') as date",
-        "SUM(CASE WHEN j.code LIKE 'SALE%' THEN CAST(jd.value AS DECIMAL) ELSE 0 END) as total_sale",
-        "SUM(CASE WHEN j.code LIKE 'BUY%' THEN CAST(jd.value AS DECIMAL) ELSE 0 END) as total_buy"
+        "DATE_FORMAT(j.created_at, '%Y-%m-%d') as date",`SUM(CASE WHEN j.code LIKE :saleCodePattern THEN CAST(jd.value AS DECIMAL) ELSE 0 END) as total_sale`,
+        `SUM(CASE WHEN j.code LIKE :buyCodePattern THEN CAST(jd.value AS DECIMAL) ELSE 0 END) as total_buy`
       ])
       .groupBy("date")
       .orderBy("date", "ASC");
