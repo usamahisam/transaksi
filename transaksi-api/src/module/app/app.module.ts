@@ -9,6 +9,7 @@ import { TableModule } from '../table/table.module';
 import { RecipeModule } from '../recipe/recipe.module';
 import { UserModule } from '../user/user.module';
 import { ProductionModule } from '../production/production.module';
+import { ProductionFlowModule } from '../production_flow/production_flow.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ProductionModule } from '../production/production.module';
     RecipeModule,
     UserModule,
     ProductionModule,
+    ProductionFlowModule,
   ],
   controllers: [],
   providers: [],

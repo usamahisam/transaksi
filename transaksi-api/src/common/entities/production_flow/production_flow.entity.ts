@@ -9,8 +9,8 @@ import {
     ManyToOne,
     OneToMany,
 } from 'typeorm';
-import { UserEntity } from '../user/user.entity';
-import { ProductionEntity } from '../production/production.entity'; // Import ProductionEntity
+import { ProductionEntity } from '../production/production.entity';
+import { ProductionFlowUserEntity } from '../production_flow_user/production_flow_user.entity';
 
 @Entity('production_flow')
 export class ProductionFlowEntity {
@@ -25,19 +25,19 @@ export class ProductionFlowEntity {
     production: ProductionEntity;
     
     @Column({ name: 'step_order', type: 'int' })
-    stepOrder: number; // Urutan langkah (misal: 1, 2, 3)
+    stepOrder: number;
 
     @Column({ length: 500 })
-    stepName: string; // Nama langkah (misal: Mixing Adonan, Baking, Packaging)
+    stepName: string;
 
-    @Column({ length: 100, nullable: true })
-    pic: string; // Person In Charge / Pegawai yang bertugas di langkah ini
+    @OneToMany(() => ProductionFlowUserEntity, worker => worker.productionFlow, { cascade: true }) 
+    workers: ProductionFlowUserEntity[];
 
     @Column({ name: 'is_completed', type: 'boolean', default: false })
-    isCompleted: boolean; // Status apakah langkah ini sudah selesai
+    isCompleted: boolean;
 
     @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
-    completedAt?: Date; // Waktu penyelesaian langkah
+    completedAt?: Date;
     
     @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
     createdAt: Date;
@@ -51,14 +51,6 @@ export class ProductionFlowEntity {
     @Column({ name: 'created_by', type: 'uuid', nullable: true })
     createdBy?: string;
 
-    @ManyToOne(() => UserEntity)
-    @JoinColumn({ name: 'created_by' })
-    createdByUser?: UserEntity;
-
     @Column({ name: 'updated_by', type: 'uuid', nullable: true })
     updatedBy?: string;
-
-    @ManyToOne(() => UserEntity)
-    @JoinColumn({ name: 'updated_by' })
-    updatedByUser?: UserEntity;
 }

@@ -1,158 +1,120 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
+import { useConfirm } from 'primevue/useconfirm';
 
-// Import komponen modal untuk membuat/mengedit order produksi
-import ProductionModal from '~/components/ProductionModal.vue'; 
+// Components
+import ProductionModal from '~/components/ProductionModal.vue';
+import ProductionDetail from '~/components/ProductionDetail.vue';
 
 definePageMeta({ layout: 'default' });
 
-const productionService = useProductionService(); 
+const productionService = useProductionService();
+const userService = useUserService();
 const toast = useToast();
+const confirm = useConfirm();
 
-// --- STATE DAFTAR PRODUKSI ---
-const productionOrders = ref([]); // Data yang akan ditampilkan di grid
+// --- STATE ---
+const productionOrders = ref([]);
+const userList = ref([]); 
 const loading = ref(true);
-const filters = ref({
-    global: { value: null, matchMode: 'contains' }
-});
 
-// --- STATE MODAL ---
+const activeTabIndex = ref(0);
 const showProductionModal = ref(false);
-const editingOrder = ref(null); // Jika null, mode Create. Jika ada isinya, mode Edit.
+const editingOrder = ref(null);
 
-// --- ACTIONS ---
+// --- ACTIONS: INITIAL DATA ---
 
-const loadProductionOrders = async () => {
+const loadInitialData = async () => {
     loading.value = true;
     try {
-        // Asumsi productionService.getAllOrders() mengembalikan array data produksi
-        // Contoh: [{ uuid, name, notes, createdAt, total_target_count, flow_status }]
-        const data = await productionService.getAllOrders();
-        productionOrders.value = data || [];
+        // Load User untuk dishare ke semua tab
+        const users = await userService.getAllUsers();
+        userList.value = users || [];
+
+        // Load Productions
+        const orders = await productionService.getAllOrders();
+        productionOrders.value = (orders || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     } catch (error) {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat daftar produksi', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat data awal' });
     } finally {
         loading.value = false;
     }
 };
+
+// --- ACTIONS: PRODUCTION CRUD (HEADER) ---
 
 const openCreateModal = () => {
     editingOrder.value = null;
     showProductionModal.value = true;
 };
 
-// [BARU] Menangani hasil sukses dari modal
-const handleProductionCreated = (newOrder) => {
-    toast.add({ severity: 'success', summary: 'Sukses', detail: `Order ${newOrder.name} berhasil dibuat.`, life: 3000 });
+const openEditModal = (order) => {
+    editingOrder.value = { ...order };
+    showProductionModal.value = true;
+};
+
+const handleOrderSubmitted = () => {
     showProductionModal.value = false;
-    loadProductionOrders(); // Muat ulang daftar
+    loadInitialData();
+    activeTabIndex.value = 0; // Reset ke tab pertama (terbaru)
 };
 
-// --- UTILS ---
-const formatDate = (dateString) => {
-    if(!dateString) return '-';
-    return new Date(dateString).toLocaleString('id-ID', {
-        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-};
-
-const getStatusSeverity = (status) => {
-    const s = (status || '').toUpperCase();
-    if (s === 'COMPLETED') return 'success';
-    if (s === 'IN_PROGRESS') return 'info';
-    if (s === 'PENDING') return 'warning';
-    return 'secondary';
+const confirmDeleteProduction = (order) => {
+    // Implementasi delete production jika diperlukan
+    toast.add({ severity: 'info', summary: 'Info', detail: 'Fitur hapus order belum tersedia.' });
 };
 
 onMounted(() => {
-    loadProductionOrders();
+    loadInitialData();
 });
 </script>
 
 <template>
-    <div class="h-full flex flex-col bg-surface-50 dark:bg-surface-950">
+    <div class="h-full flex flex-col bg-surface-50 dark:bg-surface-950 p-4">
         <Toast />
+        <ConfirmDialog />
 
         <div class="flex items-center justify-between mb-4">
-            <h1 class="text-3xl font-black text-surface-900 dark:text-surface-0 tracking-tight">Manajemen Produksi</h1>
+            <div>
+                <h1 class="text-3xl font-black text-surface-900 dark:text-surface-0 tracking-tight">Manajemen Produksi</h1>
+                <p class="text-surface-500 text-sm">Input data hasil produksi pegawai per langkah.</p>
+            </div>
             <div class="flex gap-2">
-                <Button 
-                    label="Buat Produksi" 
-                    icon="pi pi-plus" 
-                    severity="primary" 
-                    class="!py-2"
-                    @click="openCreateModal"
-                />
+                <Button label="Buat Produksi Baru" icon="pi pi-plus" severity="primary" @click="openCreateModal" />
+                <Button icon="pi pi-refresh" severity="secondary" rounded text @click="loadInitialData" />
             </div>
         </div>
 
-        <div class="rounded-2xl shadow-sm border border-surface-200 dark:border-surface-800 overflow-hidden flex-1">
+        <div class="flex-1 overflow-hidden rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 shadow-sm">
             
-            <div class="p-4 border-b border-surface-200 dark:border-surface-800 flex flex-col sm:flex-row justify-between gap-4 items-center bg-surface-50/50 dark:bg-surface-900">
-                <div class="w-full sm:w-auto">
-                    <IconField iconPosition="left">
-                        <InputIcon class="pi pi-search text-surface-400" />
-                        <InputText v-model="filters['global'].value" placeholder="Cari Nama Produksi, Catatan..." class="w-full sm:w-80 !rounded-lg pl-10" />
-                    </IconField>
-                </div>
-                <Button icon="pi pi-refresh" severity="secondary" outlined size="small" @click="loadProductionOrders" />
+            <div v-if="loading && productionOrders.length === 0" class="p-8 flex justify-center">
+                <ProgressSpinner />
             </div>
 
-            <DataTable 
-                :value="productionOrders" 
-                dataKey="uuid"
-                :loading="loading"
-                paginator :rows="10" :rowsPerPageOptions="[10,20,50]"
-                :filters="filters"
-                stripedRows
-                tableStyle="min-width: 60rem"
-                rowHover
-                class="text-sm"
-            >
-                <template #empty>
-                    <div class="flex flex-col items-center justify-center py-12 text-surface-400">
-                        <i class="pi pi-factory text-4xl mb-2 opacity-50"></i>
-                        <p>Belum ada order produksi yang tercatat.</p>
-                    </div>
-                </template>
+            <div v-else-if="productionOrders.length === 0" class="p-12 text-center text-surface-500">
+                <i class="pi pi-box text-5xl mb-4 opacity-50"></i>
+                <p>Belum ada data produksi. Silakan buat baru.</p>
+            </div>
 
-                <Column field="name" header="Nama Produksi" sortable>
-                    <template #body="slotProps">
-                        <div class="font-bold text-surface-800 dark:text-surface-100">{{ slotProps.data.name }}</div>
-                        <div class="text-[10px] text-surface-500 mt-1">Order dibuat: {{ formatDate(slotProps.data.createdAt) }}</div>
-                    </template>
-                </Column>
-                
-                <Column field="notes" header="Catatan" sortable>
-                     <template #body="slotProps">
-                        <span class="text-xs text-surface-600 italic max-w-[300px] truncate block" :title="slotProps.data.notes">
-                            "{{ slotProps.data.notes || '-' }}"
-                        </span>
-                    </template>
-                </Column>
+            <TabView v-else v-model:activeIndex="activeTabIndex" scrollable class="h-full flex flex-col" lazy>
+                <TabPanel v-for="order in productionOrders" :key="order.uuid" :header="order.name">
+                    
+                    <ProductionDetail 
+                        :production="order"
+                        :user-list="userList"
+                        @edit-production="openEditModal"
+                        @delete-production="confirmDeleteProduction"
+                    />
 
-                <Column style="width: 6rem; text-align: center">
-                    <template #body="slotProps">
-                        <Button 
-                            icon="pi pi-eye" 
-                            text 
-                            rounded 
-                            severity="secondary" 
-                            size="small" 
-                            v-tooltip.left="'Lihat Detail & Progress'" 
-                            @click="editingOrder = slotProps.data; showProductionModal = true;"
-                        />
-                    </template>
-                </Column>
-
-            </DataTable>
+                </TabPanel>
+            </TabView>
         </div>
-        
+
         <ProductionModal 
             v-model:visible="showProductionModal"
-            :initial-order="editingOrder" 
-            @order-submitted="handleProductionCreated" 
+            :initial-order="editingOrder"
+            @order-submitted="handleOrderSubmitted"
         />
 
     </div>

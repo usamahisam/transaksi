@@ -1,22 +1,20 @@
 import { Module } from '@nestjs/common';
-import { ProductionService } from './production.service';
-import { ProductionController } from './production.controller';
-import { productionProvider } from 'src/common/entities/production/production.provider';
 import { DatabaseModule } from 'src/common/db/database.module';
 import { productionFlowProvider } from 'src/common/entities/production_flow/production_flow.provider';
 import { productionFlowUserProvider } from 'src/common/entities/production_flow_user/production_flow_user.provider';
+import { ProductionFlowController } from './production_flow.controller';
+import { ProductionFlowService } from './production_flow.service';
 
 @Module({
     imports: [
         DatabaseModule
     ],
-    controllers: [ProductionController],
+    controllers: [ProductionFlowController],
     providers: [
-        ...productionProvider,
         ...productionFlowProvider,
         ...productionFlowUserProvider,
-        ProductionService
+        ProductionFlowService,
     ],
-    exports: [ProductionService],
+    exports: [ProductionFlowService],
 })
-export class ProductionModule { }
+export class ProductionFlowModule { }
